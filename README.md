@@ -79,8 +79,8 @@ The project does not include model weights. Download and place them according to
 
 | Folder | Contents | Download |
 |--------|----------|----------|
-| `PIPER_DIR` | Piper `.onnx` voice models + `.onnx.json` configs | [Hugging face]([https://github.com/rhasspy/piper/blob/master/VOICES.md](https://huggingface.co/Hacht/CapCapResource)) |
-| `F5_MODEL_DIR` | F5-TTS checkpoint (`model_last_repo_compatible_weights.pt`) + `vocab.txt` | [Hugging face]([https://github.com/rhasspy/piper/blob/master/VOICES.md](https://huggingface.co/Hacht/CapCapResource)) |
+| `PIPER_DIR` | Piper `.onnx` voice models + `.onnx.json` configs | [Hugging face](https://huggingface.co/Hacht/CapCapResource)) |
+| `F5_MODEL_DIR` | F5-TTS checkpoint (`model_last_repo_compatible_weights.pt`) + `vocab.txt` | [Hugging face](https://huggingface.co/Hacht/CapCapResource) |
 | `F5_VOCODER_DIR` | Vocos vocoder (`vocos-mel-24khz`) | Bundled with F5-TTS |
 | `F5_VOICES_DIR` | Reference audio (`.wav`/`.mp3`) + text (`.txt`) for cloned voices | Your own recordings |
 
