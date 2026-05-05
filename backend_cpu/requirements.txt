@@ -1,0 +1,8 @@
+fastapi>=0.100.0
+uvicorn>=0.20.0
+pydub>=0.25.0
+python-multipart>=0.0.6
+onnxruntime>=1.15.0
+numpy>=1.24.0
+vietnormalizer>=0.1.0
+piper-tts>=1.0.0

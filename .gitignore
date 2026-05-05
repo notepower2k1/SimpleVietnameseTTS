@@ -1,0 +1,17 @@
+__pycache__/
+*.pyc
+*.pyo
+.env
+backend/outputs/
+backend_cpu/outputs/
+backend/custom_dict/_combined/
+backend_cpu/custom_dict/_combined/
+backend/custom_dict/_history.json
+backend_cpu/custom_dict/_history.json
+backend/custom_dict/_pause.json
+backend_cpu/custom_dict/_pause.json
+*.egg-info/
+dist/
+build/
+.vscode/
+.idea/

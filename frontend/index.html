@@ -1,0 +1,2550 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Simple TTS</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Source+Sans+Pro:wght@300;400;600&family=JetBrains+Mono:wght@400&display=swap');
+
+  :root {
+    --bg-primary: #f7f3eb;
+    --bg-secondary: #ede7d9;
+    --card-bg: #faf8f3;
+    --card-border: #d4c9b8;
+    --text-primary: #3d3529;
+    --text-secondary: #6b5d4f;
+    --text-muted: #9a8b7a;
+    --accent-primary: #5b7a6a;
+    --accent-primary-hover: #4a6658;
+    --accent-secondary: #8b6f47;
+    --accent-gold: #b8943e;
+    --success: #6b8e6b;
+    --error: #b85c5c;
+    --warning: #c4a35a;
+    --shadow-sm: 0 1px 3px rgba(61,53,41,0.08);
+    --shadow-md: 0 4px 12px rgba(61,53,41,0.12);
+    --shadow-lg: 0 8px 24px rgba(61,53,41,0.16);
+    --radius-sm: 6px;
+    --radius-md: 10px;
+    --radius-lg: 14px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Source Sans Pro', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg-primary);
+    background-image:
+      radial-gradient(ellipse at 20% 50%, rgba(184,148,62,0.04) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 20%, rgba(91,122,106,0.04) 0%, transparent 50%);
+    color: var(--text-primary);
+    display: flex;
+    justify-content: center;
+    padding: 24px 16px;
+    min-height: 100vh;
+    line-height: 1.5;
+  }
+
+  .container { width: 100%; max-width: 1400px; }
+
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--card-border);
+  }
+
+  h1 {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--text-primary);
+    letter-spacing: -0.5px;
+  }
+
+  h1 span {
+    color: var(--accent-primary);
+    font-weight: 400;
+  }
+
+  .header-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .btn-icon {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius-sm);
+    background: var(--card-bg);
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 13px;
+    font-family: inherit;
+    transition: all 0.2s ease;
+  }
+
+  .btn-icon:hover {
+    background: var(--bg-secondary);
+    border-color: var(--accent-primary);
+    color: var(--accent-primary);
+  }
+
+  .btn-icon svg {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+  }
+
+  .btn-icon.danger {
+    color: var(--error);
+  }
+
+  .btn-icon.danger:hover {
+    background: rgba(184,92,92,0.08);
+    border-color: var(--error);
+  }
+
+  .main-layout {
+    display: flex;
+    gap: 20px;
+    align-items: flex-start;
+  }
+
+  .left-panel { flex: 0 0 580px; min-width: 0; }
+  .right-panel { flex: 1; min-width: 0; }
+
+  .card {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    margin-bottom: 16px;
+    box-shadow: var(--shadow-sm);
+    transition: box-shadow 0.2s ease;
+  }
+
+  .card:hover {
+    box-shadow: var(--shadow-md);
+  }
+
+  .card-title {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .card-title svg {
+    width: 16px;
+    height: 16px;
+    opacity: 0.6;
+  }
+
+  textarea {
+    width: 100%;
+    min-height: 120px;
+    padding: 12px;
+    font-size: 14px;
+    font-family: inherit;
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius-md);
+    resize: vertical;
+    outline: none;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    line-height: 1.6;
+  }
+
+  textarea:focus {
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 3px rgba(91,122,106,0.1);
+  }
+
+  textarea::placeholder {
+    color: var(--text-muted);
+    font-style: italic;
+  }
+
+  .char-count {
+    text-align: right;
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 6px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .pause-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+  }
+
+  .pause-controls select {
+    padding: 6px 10px;
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+    background: var(--card-bg);
+    color: var(--text-secondary);
+    font-family: 'JetBrains Mono', monospace;
+    cursor: pointer;
+  }
+
+  .btn-sm {
+    padding: 6px 12px;
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius-sm);
+    background: var(--card-bg);
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 12px;
+    font-family: inherit;
+    transition: all 0.2s ease;
+  }
+
+  .btn-sm:hover {
+    background: var(--bg-secondary);
+    border-color: var(--accent-primary);
+    color: var(--accent-primary);
+  }
+
+  .checkbox-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 12px;
+  }
+
+  .checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: color 0.2s ease;
+  }
+
+  .checkbox-label:hover {
+    color: var(--text-primary);
+  }
+
+  .checkbox-label input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--accent-primary);
+    cursor: pointer;
+  }
+
+  .toggle-group {
+    display: flex;
+    gap: 0;
+    margin-bottom: 14px;
+    background: var(--bg-secondary);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    width: fit-content;
+    border: 1px solid var(--card-border);
+  }
+
+  .toggle-btn {
+    padding: 8px 18px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    font-size: 13px;
+    font-family: inherit;
+    color: var(--text-secondary);
+    transition: all 0.2s ease;
+    font-weight: 400;
+  }
+
+  .toggle-btn.active {
+    background: var(--accent-primary);
+    color: #fff;
+    font-weight: 600;
+  }
+
+  .toggle-btn:hover:not(.active) {
+    background: rgba(91,122,106,0.1);
+  }
+
+  .voice-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+    padding: 10px 14px;
+    background: var(--bg-primary);
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius-md);
+    transition: border-color 0.2s ease;
+  }
+
+  .voice-row:hover {
+    border-color: var(--accent-primary);
+  }
+
+  .voice-label {
+    font-size: 15px;
+    color: var(--text-primary);
+    flex: 1;
+    font-weight: 600;
+    font-family: 'Playfair Display', Georgia, serif;
+    letter-spacing: 0.3px;
+  }
+
+  .voice-label .gender-icon {
+    margin-left: 6px;
+    opacity: 0.5;
+    font-size: 14px;
+  }
+
+  .voice-label .voice-engine-badge {
+    display: inline-block;
+    font-size: 10px;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 400;
+    padding: 2px 8px;
+    border-radius: 10px;
+    margin-left: 8px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+
+  .voice-engine-badge.piper {
+    background: rgba(91,122,106,0.1);
+    color: var(--accent-primary);
+  }
+
+  .voice-engine-badge.f5 {
+    background: rgba(184,148,62,0.1);
+    color: var(--accent-gold);
+  }
+
+  .btn-voice-change {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius-sm);
+    background: var(--card-bg);
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 12px;
+    font-family: inherit;
+    font-weight: 600;
+    transition: all 0.2s ease;
+    letter-spacing: 0.3px;
+  }
+
+  .btn-voice-change:hover {
+    background: var(--accent-primary);
+    border-color: var(--accent-primary);
+    color: #fff;
+  }
+
+  .btn-voice-change svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  .btn-voice-new {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 12px;
+    border: 1px dashed var(--accent-gold);
+    border-radius: var(--radius-sm);
+    background: rgba(184,148,62,0.06);
+    color: var(--accent-gold);
+    cursor: pointer;
+    font-size: 12px;
+    font-family: inherit;
+    font-weight: 600;
+    transition: all 0.2s ease;
+  }
+
+  .btn-voice-new:hover {
+    background: rgba(184,148,62,0.12);
+    border-style: solid;
+  }
+
+  .action-row {
+    display: flex;
+    gap: 10px;
+    margin-top: 14px;
+  }
+
+  .btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    font-family: inherit;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .btn svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .btn-primary {
+    background: var(--accent-primary);
+    color: #fff;
+    flex: 1;
+  }
+
+  .btn-primary:hover {
+    background: var(--accent-primary-hover);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .btn-primary:disabled {
+    background: var(--text-muted);
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+
+  .btn-secondary {
+    background: var(--bg-secondary);
+    color: var(--accent-primary);
+    border: 1px solid var(--card-border);
+  }
+
+  .btn-secondary:hover {
+    background: rgba(91,122,106,0.1);
+    border-color: var(--accent-primary);
+  }
+
+  .btn-success {
+    background: var(--success);
+    color: #fff;
+  }
+
+  .btn-success:hover {
+    background: #5a7a5a;
+  }
+
+  .btn-warning {
+    background: var(--warning);
+    color: var(--text-primary);
+  }
+
+  .btn-warning:hover {
+    background: #b0934e;
+  }
+
+  .btn-ghost {
+    background: transparent;
+    color: var(--text-secondary);
+    border: 1px solid var(--card-border);
+  }
+
+  .btn-ghost:hover {
+    background: var(--bg-secondary);
+    border-color: var(--text-muted);
+  }
+
+  .progress-section {
+    padding: 4px 0;
+  }
+
+  .progress-bar-bg {
+    height: 8px;
+    background: var(--bg-secondary);
+    border-radius: 4px;
+    overflow: hidden;
+    border: 1px solid var(--card-border);
+  }
+
+  .progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent-primary), var(--accent-gold));
+    border-radius: 4px;
+    transition: width 0.4s ease;
+    width: 0;
+  }
+
+  .progress-label {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 8px;
+    text-align: center;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .output-section audio {
+    width: 100%;
+    outline: none;
+    height: 42px;
+    border-radius: var(--radius-sm);
+  }
+
+  .output-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .output-actions select {
+    padding: 6px 10px;
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+    background: var(--card-bg);
+    color: var(--text-secondary);
+    font-family: inherit;
+  }
+
+  .btn-merge {
+    background: var(--accent-primary);
+    color: #fff;
+    width: 100%;
+    padding: 12px;
+    font-size: 14px;
+    font-weight: 600;
+    border: none;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .btn-merge:hover {
+    background: var(--accent-primary-hover);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .btn-merge:disabled {
+    background: var(--text-muted);
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+
+  .error-msg {
+    color: var(--error);
+    font-size: 13px;
+    margin-top: 10px;
+    text-align: center;
+    padding: 10px;
+    background: rgba(184,92,92,0.06);
+    border-radius: var(--radius-sm);
+    border: 1px solid rgba(184,92,92,0.15);
+  }
+
+  /* Chunk list */
+  .chunk-item {
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius-md);
+    margin-bottom: 8px;
+    transition: all 0.2s ease;
+    background: var(--card-bg);
+  }
+
+  .chunk-item:hover {
+    border-color: var(--accent-primary);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .chunk-item.processing {
+    border-color: var(--accent-primary);
+    background: rgba(91,122,106,0.04);
+  }
+
+  .chunk-item.done {
+    border-color: var(--success);
+  }
+
+  .chunk-item.error {
+    border-color: var(--error);
+  }
+
+  .chunk-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .chunk-index {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--bg-secondary);
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    flex-shrink: 0;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .chunk-item.done .chunk-index {
+    background: var(--success);
+    color: #fff;
+  }
+
+  .chunk-item.error .chunk-index {
+    background: var(--error);
+    color: #fff;
+  }
+
+  .chunk-item.processing .chunk-index {
+    background: var(--accent-primary);
+    color: #fff;
+    animation: pulse 1.5s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+
+  .chunk-status-icon {
+    font-size: 14px;
+    flex-shrink: 0;
+    width: 18px;
+    text-align: center;
+  }
+
+  .chunk-text-preview {
+    flex: 1;
+    font-size: 13px;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+  }
+
+  .chunk-actions {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+
+  .chunk-actions button {
+    padding: 4px 8px;
+    border: 1px solid var(--card-border);
+    border-radius: 4px;
+    background: var(--card-bg);
+    cursor: pointer;
+    font-size: 12px;
+    line-height: 1.4;
+    color: var(--text-secondary);
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .chunk-actions button:hover {
+    background: var(--bg-secondary);
+    border-color: var(--accent-primary);
+    color: var(--accent-primary);
+  }
+
+  .chunk-actions button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .chunk-actions button svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  .chunk-body {
+    padding: 0 12px 12px;
+    display: none;
+  }
+
+  .chunk-body.open {
+    display: block;
+  }
+
+  .chunk-body textarea {
+    width: 100%;
+    min-height: 60px;
+    padding: 10px;
+    font-size: 13px;
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius-sm);
+    resize: vertical;
+    font-family: inherit;
+    outline: none;
+    background: var(--bg-primary);
+  }
+
+  .chunk-body textarea:focus {
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 3px rgba(91,122,106,0.1);
+  }
+
+  .chunk-body-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+    justify-content: flex-end;
+  }
+
+  .no-chunks {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 13px;
+    padding: 40px 0;
+    font-style: italic;
+  }
+
+  .hidden { display: none !important; }
+
+  /* Advanced panel */
+  .adv-toggle {
+    font-size: 12px;
+    color: var(--text-muted);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    transition: color 0.2s ease;
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid var(--card-border);
+  }
+
+  .adv-toggle:hover {
+    color: var(--text-primary);
+  }
+
+  .adv-toggle svg {
+    width: 12px;
+    height: 12px;
+    transition: transform 0.2s ease;
+  }
+
+  .adv-toggle.open svg {
+    transform: rotate(180deg);
+  }
+
+  .slider-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 14px;
+    padding: 8px 12px;
+    background: var(--bg-primary);
+    border-radius: var(--radius-sm);
+    border: 1px solid transparent;
+    transition: border-color 0.2s ease;
+  }
+
+  .slider-row:hover {
+    border-color: var(--card-border);
+  }
+
+  .slider-label {
+    width: 55px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    flex-shrink: 0;
+  }
+
+  .slider-row input[type="range"] {
+    flex: 1;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 6px;
+    border-radius: 3px;
+    background: var(--card-border);
+    outline: none;
+    cursor: pointer;
+  }
+
+  .slider-row input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--accent-primary);
+    cursor: pointer;
+    border: 3px solid var(--card-bg);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  .slider-row input[type="range"]::-webkit-slider-thumb:hover {
+    transform: scale(1.15);
+    box-shadow: 0 2px 8px rgba(91,122,106,0.3);
+  }
+
+  .slider-row input[type="range"]::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--accent-primary);
+    cursor: pointer;
+    border: 3px solid var(--card-bg);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+  }
+
+  .slider-value {
+    width: 44px;
+    font-size: 13px;
+    color: var(--accent-primary);
+    text-align: right;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+    background: rgba(91,122,106,0.08);
+    padding: 3px 8px;
+    border-radius: 4px;
+    flex-shrink: 0;
+  }
+
+  /* Modal */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(61,53,41,0.5);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    padding: 20px;
+  }
+
+  .modal-overlay.hidden { display: none; }
+
+  .modal {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius-lg);
+    padding: 24px;
+    width: 100%;
+    max-width: 520px;
+    box-shadow: var(--shadow-lg);
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+
+  .modal h2 {
+    font-family: 'Playfair Display', Georgia, serif;
+    margin-bottom: 18px;
+    font-size: 20px;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .modal h2 svg {
+    width: 22px;
+    height: 22px;
+    color: var(--accent-primary);
+  }
+
+  .modal label {
+    display: block;
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin: 12px 0 6px;
+    font-weight: 600;
+  }
+
+  .modal input,
+  .modal textarea {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius-sm);
+    font-size: 14px;
+    font-family: inherit;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    outline: none;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .modal input:focus,
+  .modal textarea:focus {
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 3px rgba(91,122,106,0.1);
+  }
+
+  .modal textarea {
+    min-height: 70px;
+    resize: vertical;
+  }
+
+  .modal-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid var(--card-border);
+  }
+
+  .modal-actions button {
+    padding: 8px 20px;
+    border: none;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-size: 14px;
+    font-family: inherit;
+    font-weight: 600;
+    transition: all 0.2s ease;
+  }
+
+  .modal-actions .btn-cancel {
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+  }
+
+  .modal-actions .btn-cancel:hover {
+    background: var(--card-border);
+  }
+
+  .modal-actions .btn-save {
+    background: var(--accent-primary);
+    color: #fff;
+  }
+
+  .modal-actions .btn-save:hover {
+    background: var(--accent-primary-hover);
+  }
+
+  /* Toast */
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--accent-primary);
+    color: #fff;
+    padding: 10px 24px;
+    border-radius: var(--radius-sm);
+    font-size: 14px;
+    box-shadow: var(--shadow-md);
+    z-index: 200;
+    animation: toastIn 0.3s ease, toastOut 0.3s ease 1.7s forwards;
+  }
+
+  @keyframes toastIn {
+    from { opacity: 0; transform: translateX(-50%) translateY(20px); }
+    to { opacity: 1; transform: translateX(-50%) translateY(0); }
+  }
+
+  @keyframes toastOut {
+    from { opacity: 1; }
+    to { opacity: 0; }
+  }
+
+  /* Pagination */
+  .pagination {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+
+  .pagination button {
+    padding: 4px 10px;
+    border: 1px solid var(--card-border);
+    border-radius: 4px;
+    background: var(--card-bg);
+    cursor: pointer;
+    color: var(--text-secondary);
+    transition: all 0.2s ease;
+    font-size: 12px;
+  }
+
+  .pagination button:hover:not(:disabled) {
+    background: var(--bg-secondary);
+    border-color: var(--accent-primary);
+    color: var(--accent-primary);
+  }
+
+  .pagination button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  /* Dictionary tabs */
+  .dict-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+
+  .dict-tab {
+    padding: 6px 16px;
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius-sm);
+    background: var(--card-bg);
+    cursor: pointer;
+    font-size: 13px;
+    font-family: inherit;
+    color: var(--text-secondary);
+    transition: all 0.2s ease;
+  }
+
+  .dict-tab.active {
+    background: var(--accent-primary);
+    color: #fff;
+    border-color: var(--accent-primary);
+  }
+
+  .dict-tab:hover:not(.active) {
+    background: var(--bg-secondary);
+  }
+
+  .dict-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+
+  .dict-table th {
+    text-align: left;
+    padding: 8px 10px;
+    color: var(--text-muted);
+    font-weight: 600;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 2px solid var(--card-border);
+  }
+
+  .dict-table td {
+    padding: 6px 10px;
+    vertical-align: middle;
+    border-bottom: 1px solid rgba(212,201,184,0.5);
+  }
+
+  .dict-table input {
+    width: 100%;
+    padding: 6px 8px;
+    border: 1px solid var(--card-border);
+    border-radius: 4px;
+    font-size: 13px;
+    font-family: inherit;
+    outline: none;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+  }
+
+  .dict-table input:focus {
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 2px rgba(91,122,106,0.1);
+  }
+
+  .btn-dict-del {
+    padding: 4px 10px;
+    border: 1px solid var(--card-border);
+    border-radius: 4px;
+    background: var(--card-bg);
+    cursor: pointer;
+    font-size: 12px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    transition: all 0.2s ease;
+  }
+
+  .btn-dict-del:hover {
+    background: rgba(184,92,92,0.08);
+    border-color: var(--error);
+    color: var(--error);
+  }
+
+  .btn-dict-add {
+    margin-top: 10px;
+    padding: 6px 14px;
+    border: 1px dashed var(--card-border);
+    border-radius: var(--radius-sm);
+    background: transparent;
+    cursor: pointer;
+    font-size: 12px;
+    color: var(--accent-primary);
+    font-family: inherit;
+    transition: all 0.2s ease;
+  }
+
+  .btn-dict-add:hover {
+    background: rgba(91,122,106,0.06);
+    border-color: var(--accent-primary);
+  }
+
+  .dict-table-wrap {
+    max-height: 280px;
+    overflow-y: auto;
+  }
+
+  .dict-table-wrap::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .dict-table-wrap::-webkit-scrollbar-track {
+    background: var(--bg-secondary);
+    border-radius: 3px;
+  }
+
+  .dict-table-wrap::-webkit-scrollbar-thumb {
+    background: var(--card-border);
+    border-radius: 3px;
+  }
+
+  /* History */
+  .hist-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius-md);
+    margin-bottom: 8px;
+    background: var(--card-bg);
+    transition: all 0.2s ease;
+  }
+
+  .hist-item:hover {
+    border-color: var(--accent-primary);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .hist-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .hist-text {
+    font-size: 13px;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .hist-meta {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 4px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .hist-actions {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+
+  .hist-actions button {
+    padding: 4px 10px;
+    border: 1px solid var(--card-border);
+    border-radius: 4px;
+    background: var(--card-bg);
+    cursor: pointer;
+    font-size: 12px;
+    color: var(--text-secondary);
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .hist-actions button:hover {
+    background: var(--bg-secondary);
+    border-color: var(--accent-primary);
+    color: var(--accent-primary);
+  }
+
+  .hist-actions button svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  .hist-empty {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 13px;
+    padding: 40px 0;
+    font-style: italic;
+  }
+
+  /* Voice cards */
+  .voice-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius-md);
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background: var(--card-bg);
+  }
+
+  .voice-card:hover {
+    border-color: var(--accent-primary);
+    background: rgba(91,122,106,0.04);
+  }
+
+  .voice-card.selected {
+    border-color: var(--accent-primary);
+    background: rgba(91,122,106,0.08);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .voice-card-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+    border: 2px solid var(--card-border);
+  }
+
+  .voice-card-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .voice-card-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .voice-card-desc {
+    font-size: 12px;
+    color: var(--text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    margin-top: 2px;
+  }
+
+  .voice-card-actions {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+
+  .voice-card-actions button {
+    padding: 6px 10px;
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius-sm);
+    background: var(--card-bg);
+    cursor: pointer;
+    font-size: 12px;
+    color: var(--text-secondary);
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .voice-card-actions button:hover {
+    background: var(--bg-secondary);
+    border-color: var(--accent-primary);
+    color: var(--accent-primary);
+  }
+
+  .voice-card-actions button svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  /* Pause toggle */
+  .pause-toggle-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 18px;
+  }
+
+  .pause-toggle {
+    position: relative;
+    display: inline-block;
+    width: 48px;
+    height: 26px;
+    cursor: pointer;
+  }
+
+  .pause-toggle input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+
+  .pause-toggle-track {
+    position: absolute;
+    inset: 0;
+    background: var(--card-border);
+    border-radius: 13px;
+    transition: 0.3s;
+  }
+
+  .pause-toggle input:checked + .pause-toggle-track {
+    background: var(--accent-primary);
+  }
+
+  .pause-toggle-knob {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 20px;
+    height: 20px;
+    background: #fff;
+    border-radius: 50%;
+    transition: 0.3s;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+  }
+
+  .pause-toggle input:checked ~ .pause-toggle-knob {
+    transform: translateX(22px);
+  }
+
+  .pause-toggle-label {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .pause-toggle-desc {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-left: auto;
+  }
+
+  .pause-slider-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 12px;
+  }
+
+  .pause-slider-label {
+    width: 140px;
+    font-size: 13px;
+    color: var(--text-secondary);
+    flex-shrink: 0;
+  }
+
+  .pause-slider-row input[type="range"] {
+    flex: 1;
+    accent-color: var(--accent-primary);
+    cursor: pointer;
+  }
+
+  .pause-slider-val {
+    width: 50px;
+    text-align: right;
+    font-size: 13px;
+    color: var(--text-secondary);
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  /* Responsive */
+  @media (max-width: 900px) {
+    .main-layout {
+      flex-direction: column;
+    }
+    .left-panel {
+      flex: none;
+      width: 100%;
+    }
+    .header {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 12px;
+    }
+    .header-actions {
+      flex-wrap: wrap;
+    }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>Simple <span>TTS</span></h1>
+    <div class="header-actions">
+      <button class="btn-icon" id="dictBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+        Dict
+      </button>
+      <button class="btn-icon" id="pauseBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        Pause
+      </button>
+      <button class="btn-icon" id="historyBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3"/></svg>
+        History
+      </button>
+      <button class="btn-icon danger" id="resetBtn" style="display:none;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+        Reset
+      </button>
+    </div>
+  </div>
+
+  <div class="main-layout">
+    <!-- LEFT PANEL -->
+    <div class="left-panel">
+      <div class="card">
+        <textarea id="textInput" placeholder="Paste your text here..."></textarea>
+        <div class="char-count"><span id="charCount">0</span> / 5000 characters</div>
+        <div class="pause-controls">
+          <select id="pauseDurSelect">
+            <option value="0.5">0.5s</option>
+            <option value="1" selected>1s</option>
+            <option value="1.5">1.5s</option>
+            <option value="2">2s</option>
+            <option value="2.5">2.5s</option>
+            <option value="3">3s</option>
+          </select>
+          <button class="btn-sm" id="insertPauseBtn">+ Insert pause</button>
+        </div>
+        <div class="checkbox-group">
+          <label class="checkbox-label">
+            <input type="checkbox" id="normalizeCheckbox" checked>
+            <span>Vietnamese normalize</span>
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" id="cleanCheckbox" checked>
+            <span>Auto clean text</span>
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" id="normalizeAudioCheckbox" checked>
+            <span>Normalize volume</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="toggle-group" id="voiceModeToggle">
+          <button class="toggle-btn active" data-mode="preset">Fast Voice</button>
+          <button class="toggle-btn" data-mode="custom">Detail Voice</button>
+        </div>
+        <div class="voice-row">
+          <span class="voice-label" id="currentVoiceLabel">Ban Mai <span class="gender-icon">&#9792;</span></span>
+          <button class="btn-voice-change" id="selectVoiceBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            Change
+          </button>
+          <button class="btn-voice-new" id="newVoiceBtn" style="display:none;">+ New</button>
+        </div>
+        <div class="action-row">
+          <button class="btn btn-secondary" id="previewBtn">
+            <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            Preview
+          </button>
+          <button class="btn btn-primary" id="generateBtn">Generate</button>
+        </div>
+        <div class="adv-toggle" onclick="toggleAdv(this)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          Advanced
+        </div>
+        <div id="advPanel" class="hidden" style="margin-top:14px;">
+          <div class="slider-row">
+            <span class="slider-label">Speed</span>
+            <input type="range" id="speedSlider" min="0.5" max="2" step="0.1" value="1">
+            <span class="slider-value" id="speedVal">1.0×</span>
+          </div>
+          <div class="slider-row">
+            <span class="slider-label">Pitch</span>
+            <input type="range" id="pitchSlider" min="-5" max="5" step="0.5" value="0">
+            <span class="slider-value" id="pitchVal">0</span>
+          </div>
+          <div class="slider-row">
+            <span class="slider-label">Volume</span>
+            <input type="range" id="volumeSlider" min="-10" max="10" step="1" value="0">
+            <span class="slider-value" id="volumeVal">0 dB</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card hidden" id="progressCard">
+        <div class="progress-section">
+          <div class="progress-bar-bg"><div class="progress-bar-fill" id="progressFill"></div></div>
+          <div class="progress-label" id="progressLabel">...</div>
+        </div>
+      </div>
+
+      <div class="card hidden" id="outputCard">
+        <div class="output-section">
+          <audio id="audioPlayer" controls></audio>
+          <div class="output-actions">
+            <select id="formatSelect">
+              <option value="mp3">MP3</option>
+              <option value="wav">WAV</option>
+              <option value="srt">SRT</option>
+            </select>
+            <button class="btn btn-success btn-sm" id="downloadBtn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Download
+            </button>
+            <button class="btn btn-ghost btn-sm" id="regenAllBtn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+              Regenerate
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div id="errorDisplay" class="error-msg hidden"></div>
+    </div>
+
+    <!-- RIGHT PANEL -->
+    <div class="right-panel">
+      <div class="card" id="chunkPanel">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+          <span class="card-title" style="margin-bottom:0;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            Text Segments <span id="chunkCount" style="font-weight:400;color:var(--text-muted);font-size:12px;"></span>
+          </span>
+          <div class="pagination" id="chunkPagination" style="display:none;">
+            <button id="pagePrev">&#9664;</button>
+            <span id="pageInfo"></span>
+            <button id="pageNext">&#9654;</button>
+          </div>
+        </div>
+        <div id="chunkList">
+          <div class="no-chunks">Enter text and click Generate to see segments</div>
+        </div>
+        <div id="mergeSection" class="hidden" style="margin-top:14px;">
+          <button class="btn-merge" id="mergeBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;"><path d="M8 6L21 6"/><path d="M8 12L21 12"/><path d="M8 18L21 18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+            Merge &amp; Download All
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Dictionary Modal -->
+  <div class="modal-overlay hidden" id="dictModal">
+    <div class="modal" style="max-width:580px;">
+      <h2>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+        Dictionary
+      </h2>
+      <div class="dict-tabs">
+        <button class="dict-tab active" data-tab="acronyms" onclick="switchDictTab('acronyms')">Acronyms</button>
+        <button class="dict-tab" data-tab="words" onclick="switchDictTab('words')">Words</button>
+      </div>
+      <div id="dictAcronyms">
+        <div class="dict-table-wrap">
+          <table class="dict-table"><thead><tr><th>Acronym</th><th>Pronunciation</th><th></th></tr></thead><tbody id="acroBody"></tbody></table>
+        </div>
+        <button class="btn-dict-add" onclick="addDictRow('acronyms')">+ Add entry</button>
+      </div>
+      <div id="dictWords" class="hidden">
+        <div class="dict-table-wrap">
+          <table class="dict-table"><thead><tr><th>Word</th><th>Pronunciation</th><th></th></tr></thead><tbody id="wordBody"></tbody></table>
+        </div>
+        <button class="btn-dict-add" onclick="addDictRow('words')">+ Add entry</button>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-cancel" id="dictCloseBtn">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pause Modal -->
+  <div class="modal-overlay hidden" id="pauseModal">
+    <div class="modal" style="max-width:440px;">
+      <h2>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        Punctuation Pauses
+      </h2>
+      <div class="pause-toggle-row">
+        <label class="pause-toggle">
+          <input type="checkbox" id="pauseToggle" onchange="onPauseToggle()">
+          <span class="pause-toggle-track"></span>
+          <span class="pause-toggle-knob"></span>
+        </label>
+        <span class="pause-toggle-label" id="pauseToggleLabel">ON</span>
+        <span class="pause-toggle-desc">Silence after punctuation (seconds)</span>
+      </div>
+      <div id="pauseSliders"></div>
+      <div class="modal-actions">
+        <button class="btn-cancel" id="pauseCloseBtn">Close</button>
+        <button class="btn-save" id="pauseSaveBtn">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Voice Select Modal -->
+  <div class="modal-overlay hidden" id="voiceModal">
+    <div class="modal" style="max-width:620px;">
+      <h2>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+        Select Voice
+      </h2>
+      <div class="dict-tabs">
+        <button class="dict-tab active" data-tab="preset" onclick="switchVoiceTab('preset')">Fast Voice</button>
+        <button class="dict-tab" data-tab="custom" onclick="switchVoiceTab('custom')">Detail Voice</button>
+      </div>
+      <div id="voiceFastList" style="max-height:380px;overflow-y:auto;"></div>
+      <div id="voiceDetailList" class="hidden" style="max-height:380px;overflow-y:auto;"></div>
+      <div class="modal-actions">
+        <button class="btn-cancel" id="voiceCloseBtn">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- History Modal -->
+  <div class="modal-overlay hidden" id="historyModal">
+    <div class="modal" style="max-width:580px;">
+      <h2>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3"/></svg>
+        History
+      </h2>
+      <div style="max-height:420px;overflow-y:auto;" id="historyList"></div>
+      <div class="modal-actions">
+        <button class="btn-cancel" id="historyClearBtn" style="color:var(--error);">Clear All</button>
+        <button class="btn-cancel" id="historyCloseBtn">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Voice Lab Modal -->
+  <div class="modal-overlay hidden" id="voiceLabModal">
+    <div class="modal">
+      <h2>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+        Voice Lab
+      </h2>
+      <label>Voice Name</label>
+      <input id="cloneVoiceName" placeholder="e.g. my_voice_1">
+      <label>Reference Audio</label>
+      <input type="file" id="cloneRefAudio" accept="audio/*">
+      <label>Reference Text</label>
+      <textarea id="cloneRefText" placeholder="What was said in the reference audio..."></textarea>
+      <div class="modal-actions">
+        <button class="btn-cancel" id="cloneCancelBtn">Cancel</button>
+        <button class="btn-save" id="cloneSaveBtn">Save Voice</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API_BASE = '';
+let STATE = 'idle';
+let POLL_INTERVAL = null;
+let CURRENT_TASK_ID = null;
+let CURRENT_AUDIO_URL = null;
+let CHUNK_DATA = [];
+
+const textInput = document.getElementById('textInput');
+const charCount = document.getElementById('charCount');
+const voiceModeToggle = document.getElementById('voiceModeToggle');
+const previewBtn = document.getElementById('previewBtn');
+const newVoiceBtn = document.getElementById('newVoiceBtn');
+const generateBtn = document.getElementById('generateBtn');
+const progressCard = document.getElementById('progressCard');
+const progressFill = document.getElementById('progressFill');
+const progressLabel = document.getElementById('progressLabel');
+const outputCard = document.getElementById('outputCard');
+const audioPlayer = document.getElementById('audioPlayer');
+const formatSelect = document.getElementById('formatSelect');
+const downloadBtn = document.getElementById('downloadBtn');
+const regenAllBtn = document.getElementById('regenAllBtn');
+const errorDisplay = document.getElementById('errorDisplay');
+const voiceLabModal = document.getElementById('voiceLabModal');
+const cloneVoiceName = document.getElementById('cloneVoiceName');
+const cloneRefAudio = document.getElementById('cloneRefAudio');
+const cloneRefText = document.getElementById('cloneRefText');
+const cloneCancelBtn = document.getElementById('cloneCancelBtn');
+const cloneSaveBtn = document.getElementById('cloneSaveBtn');
+const chunkPanel = document.getElementById('chunkPanel');
+const chunkList = document.getElementById('chunkList');
+const mergeSection = document.getElementById('mergeSection');
+const mergeBtn = document.getElementById('mergeBtn');
+const resetBtn = document.getElementById('resetBtn');
+const chunkCount = document.getElementById('chunkCount');
+const chunkPagination = document.getElementById('chunkPagination');
+const pagePrev = document.getElementById('pagePrev');
+const pageNext = document.getElementById('pageNext');
+const pageInfo = document.getElementById('pageInfo');
+
+let CHUNK_PAGE = 0;
+const CHUNK_PER_PAGE = 10;
+
+function toggleAdv(el) {
+  const p = document.getElementById('advPanel');
+  p.classList.toggle('hidden');
+  el.classList.toggle('open');
+}
+
+['speedSlider','pitchSlider','volumeSlider'].forEach(id => {
+  const el = document.getElementById(id);
+  const valEl = document.getElementById(id.replace('Slider','Val'));
+  function updateSliderFill() {
+    const min = parseFloat(el.min);
+    const max = parseFloat(el.max);
+    const val = parseFloat(el.value);
+    const pct = ((val - min) / (max - min)) * 100;
+    el.style.background = `linear-gradient(to right, var(--accent-primary) 0%, var(--accent-primary) ${pct}%, var(--card-border) ${pct}%, var(--card-border) 100%)`;
+  }
+  el.addEventListener('input', function() {
+    const v = this.value;
+    if (id === 'speedSlider') valEl.textContent = parseFloat(v).toFixed(1) + '×';
+    else if (id === 'volumeSlider') valEl.textContent = v + ' dB';
+    else valEl.textContent = v;
+    updateSliderFill();
+  });
+  updateSliderFill();
+});
+
+progressCard.classList.add('hidden');
+outputCard.classList.add('hidden');
+
+let VOICE_RATES = {preset: 18, custom: {}};
+let PAUSE_CFG = {enabled: true, pauses: {'.': 0.4, ',': 0.2, ';': 0.3, ':': 0.3, '?': 0.4, '!': 0.4, linebreak: 0.6}};
+
+textInput.addEventListener('input', updateCharCount);
+
+function updateCharCount() {
+  const text = textInput.value;
+  const len = text.length;
+  charCount.textContent = len;
+  charCount.style.color = len > 4800 ? 'var(--error)' : 'var(--text-muted)';
+  const mode = document.querySelector('.toggle-btn.active').dataset.mode;
+  let rate = VOICE_RATES.preset;
+  if (CURRENT_VOICE_MODE === 'custom') {
+    rate = VOICE_RATES.custom[CURRENT_VOICE_ID] || 18;
+  }
+  let estSec = len > 0 ? len / rate : 0;
+  if (PAUSE_CFG.enabled) {
+    const p = PAUSE_CFG.pauses;
+    for (const ch of Object.keys(p)) {
+      if (ch === 'linebreak') continue;
+      const count = (text.match(new RegExp('\\' + ch, 'g')) || []).length;
+      estSec += count * p[ch];
+    }
+    const lb = (text.match(/\n\s*\n/g) || []).length;
+    estSec += lb * (p.linebreak || 0);
+    const markers = text.match(/\[(\d+(?:\.\d+)?)\s*s\]/gi) || [];
+    for (const m of markers) {
+      const val = parseFloat(m.match(/[\d.]+/)[0]);
+      estSec += val;
+    }
+  }
+  const rounded = Math.round(estSec);
+  const estMin = Math.floor(rounded / 60);
+  const estRem = rounded % 60;
+  const label = len > 0 ? ` (~${estMin > 0 ? estMin + 'm ' : ''}${estRem}s)` : '';
+  charCount.textContent = len + label;
+}
+
+let CURRENT_VOICE_MODE = 'preset';
+let CURRENT_VOICE_ID = 'banmai';
+let ALL_VOICES = {preset: [], custom: []};
+
+voiceModeToggle.addEventListener('click', e => {
+  const btn = e.target.closest('.toggle-btn');
+  if (!btn) return;
+  voiceModeToggle.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  CURRENT_VOICE_MODE = btn.dataset.mode;
+  document.getElementById('newVoiceBtn').style.display = CURRENT_VOICE_MODE === 'custom' ? 'inline-block' : 'none';
+  const list = ALL_VOICES[CURRENT_VOICE_MODE] || [];
+  if (list.length > 0 && !list.find(v => v.id === CURRENT_VOICE_ID)) {
+    selectVoice(list[0].id, list[0].label, list[0].gender || '');
+  }
+  updateVoiceLabel();
+  updateCharCount();
+});
+
+async function loadVoices() {
+  try {
+    const res = await fetch(`${API_BASE}/tts/voices`);
+    const data = await res.json();
+    ALL_VOICES = data;
+    if (data.preset.length && data.preset[0].rate) VOICE_RATES.preset = data.preset[0].rate;
+    const cr = {};
+    (data.custom || []).forEach(v => { cr[v.id] = v.rate || 18; });
+    VOICE_RATES.custom = cr;
+    if (data.preset.length > 0) {
+      selectVoice(data.preset[0].id, data.preset[0].label, data.preset[0].gender || '');
+    }
+  } catch (e) { console.error(e); }
+}
+
+function selectVoice(id, label, gender) {
+  CURRENT_VOICE_ID = id;
+  updateVoiceLabel();
+}
+
+function updateVoiceLabel() {
+  const list = ALL_VOICES[CURRENT_VOICE_MODE] || [];
+  const v = list.find(x => x.id === CURRENT_VOICE_ID);
+  const genderIcon = v && v.gender === 'male' ? '&#9794;' : v && v.gender === 'female' ? '&#9792;' : '';
+  const engineBadge = CURRENT_VOICE_MODE === 'custom'
+    ? '<span class="voice-engine-badge f5">F5</span>'
+    : '<span class="voice-engine-badge piper">Piper</span>';
+  const label = v ? `${v.label} <span class="gender-icon">${genderIcon}</span>${engineBadge}` : (CURRENT_VOICE_ID || 'Unknown');
+  document.getElementById('currentVoiceLabel').innerHTML = label;
+}
+
+function getCurrentVoiceLabel() {
+  const list = ALL_VOICES[CURRENT_VOICE_MODE] || [];
+  const v = list.find(x => x.id === CURRENT_VOICE_ID);
+  return v ? v.label : CURRENT_VOICE_ID;
+}
+
+/* Voice Modal */
+function switchVoiceTab(tab) {
+  document.querySelectorAll('#voiceModal .dict-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  document.getElementById('voiceFastList').classList.toggle('hidden', tab !== 'preset');
+  document.getElementById('voiceDetailList').classList.toggle('hidden', tab !== 'custom');
+  renderVoiceList(tab);
+}
+
+function renderVoiceList(mode) {
+  const container = document.getElementById(mode === 'preset' ? 'voiceFastList' : 'voiceDetailList');
+  const list = ALL_VOICES[mode] || [];
+  if (list.length === 0) {
+    container.innerHTML = '<div class="hist-empty">No voices available</div>'; return;
+  }
+  container.innerHTML = list.map(v => {
+    const isSelected = v.id === CURRENT_VOICE_ID && CURRENT_VOICE_MODE === mode;
+    const genderIcon = v.gender === 'male' ? '&#9794;' : v.gender === 'female' ? '&#9792;' : '&#9733;';
+    const genderColor = v.gender === 'male' ? 'var(--accent-primary)' : v.gender === 'female' ? '#c47a9e' : 'var(--text-muted)';
+    return `<div class="voice-card ${isSelected ? 'selected' : ''}" onclick="selectVoiceFromCard('${mode}','${v.id}')">
+      <div class="voice-card-avatar" style="background:${genderColor}15;color:${genderColor};border-color:${genderColor}40;">${genderIcon}</div>
+      <div class="voice-card-info">
+        <div class="voice-card-name">${escapeHtml(v.label)}</div>
+        <div class="voice-card-desc">${escapeHtml(v.description || v.ref_text || '')}</div>
+      </div>
+      <div class="voice-card-actions">
+        <button onclick="event.stopPropagation();previewVoice('${mode}','${v.id}')" title="Preview">
+          <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        </button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function selectVoiceFromCard(mode, id) {
+  const list = ALL_VOICES[mode] || [];
+  const v = list.find(x => x.id === id);
+  if (v) {
+    CURRENT_VOICE_MODE = mode;
+    CURRENT_VOICE_ID = id;
+    updateVoiceLabel();
+    document.querySelectorAll('#voiceModeToggle .toggle-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+    document.getElementById('newVoiceBtn').style.display = mode === 'custom' ? 'inline-block' : 'none';
+    updateCharCount();
+    renderVoiceList(mode);
+  }
+}
+
+function previewVoice(mode, id) {
+  const list = ALL_VOICES[mode] || [];
+  const v = list.find(x => x.id === id);
+  if (!v) return;
+  if (mode === 'preset') {
+    const text = 'Xin chào đây là đoạn thử giọng nói, cảm ơn bạn đã lắng nghe.';
+    fetch(`${API_BASE}/tts/preview`, {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({text, voice_mode: 'preset', voice_id: id, normalize: false, clean: false, normalize_audio: true, speed: 1, pitch: 0, volume: 0}),
+    }).then(r => r.json()).then(data => {
+      const wrap = getOrCreateMiniPlayer();
+      const aud = wrap.querySelector('audio');
+      aud.src = `${API_BASE}${data.audio_url}`;
+      aud.play().catch(() => {});
+    }).catch(() => {});
+  } else {
+    const url = `${API_BASE}/tts/voice_audio/f5/${id}`;
+    const wrap = getOrCreateMiniPlayer();
+    const aud = wrap.querySelector('audio');
+    aud.src = url;
+    aud.play().catch(() => {});
+  }
+}
+
+function getOrCreateMiniPlayer() {
+  const old = document.getElementById('chunkPlayer');
+  if (old) return old;
+  const wrap = document.createElement('div');
+  wrap.id = 'chunkPlayer';
+  wrap.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--card-bg);border:1px solid var(--card-border);border-radius:var(--radius-md);padding:10px 18px;box-shadow:var(--shadow-lg);z-index:300;display:flex;align-items:center;gap:12px;';
+  const aud = document.createElement('audio');
+  aud.controls = true;
+  aud.style.cssText = 'height:34px;width:280px;';
+  const close = document.createElement('button');
+  close.innerHTML = '&times;';
+  close.style.cssText = 'border:none;background:none;font-size:22px;cursor:pointer;color:var(--text-muted);padding:0 4px;line-height:1;';
+  close.onclick = () => wrap.remove();
+  wrap.appendChild(aud);
+  wrap.appendChild(close);
+  document.body.appendChild(wrap);
+  return wrap;
+}
+
+document.getElementById('selectVoiceBtn').addEventListener('click', () => {
+  const modal = document.getElementById('voiceModal');
+  modal.classList.remove('hidden');
+  const tab = document.querySelector('#voiceModal .dict-tab.active');
+  if (tab) switchVoiceTab(tab.dataset.tab);
+  else switchVoiceTab('preset');
+});
+document.getElementById('voiceCloseBtn').addEventListener('click', () => {
+  document.getElementById('voiceModal').classList.add('hidden');
+});
+document.getElementById('voiceModal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) document.getElementById('voiceModal').classList.add('hidden');
+});
+
+document.getElementById('insertPauseBtn').addEventListener('click', () => {
+  const ta = document.getElementById('textInput');
+  const sel = document.getElementById('pauseDurSelect');
+  const marker = `[${sel.value}s]`;
+  const start = ta.selectionStart, end = ta.selectionEnd;
+  const pos = end;
+  ta.value = ta.value.slice(0, pos) + marker + ta.value.slice(pos);
+  const newPos = pos + marker.length;
+  ta.setSelectionRange(newPos, newPos);
+  ta.focus();
+  ta.dispatchEvent(new Event('input'));
+});
+
+previewBtn.addEventListener('click', async () => {
+  const text = textInput.value.trim();
+  if (!text) return;
+  const normalize = document.getElementById('normalizeCheckbox').checked;
+  previewBtn.disabled = true; previewBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;animation:spin 1s linear infinite;"><circle cx="12" cy="12" r="10" stroke-dasharray="30 70"/></svg> Preview';
+  try {
+    const res = await fetch(`${API_BASE}/tts/preview`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({text, voice_mode: CURRENT_VOICE_MODE, voice_id: CURRENT_VOICE_ID, normalize, clean: document.getElementById('cleanCheckbox').checked, normalize_audio: document.getElementById('normalizeAudioCheckbox').checked, speed: parseFloat(document.getElementById('speedSlider').value), pitch: parseFloat(document.getElementById('pitchSlider').value), volume: parseFloat(document.getElementById('volumeSlider').value)}),
+    });
+    if (!res.ok) throw new Error('Preview failed');
+    const data = await res.json();
+    audioPlayer.src = `${API_BASE}${data.audio_url}`;
+    audioPlayer.play().catch(() => {});
+  } catch (e) { showError('Preview: ' + e.message); }
+  previewBtn.disabled = false; previewBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor" style="width:16px;height:16px;"><polygon points="5 3 19 12 5 21 5 3"/></svg> Preview';
+});
+
+generateBtn.addEventListener('click', startGeneration);
+
+async function startGeneration() {
+  const text = textInput.value.trim();
+  if (!text) { showError('Enter some text'); return; }
+  const normalize = document.getElementById('normalizeCheckbox').checked;
+  if (!CURRENT_VOICE_ID) { showError('Select a voice'); return; }
+
+  hideError();
+  outputCard.classList.add('hidden');
+  progressCard.classList.remove('hidden');
+  mergeSection.classList.add('hidden');
+  setProgress(0, 'Starting...');
+  resetBtn.style.display = 'inline-flex';
+  generateBtn.disabled = true;
+  STATE = 'loading';
+
+  try {
+    const res = await fetch(`${API_BASE}/tts/generate`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({text, voice_mode: CURRENT_VOICE_MODE, voice_id: CURRENT_VOICE_ID, output_format: 'mp3', normalize, clean: document.getElementById('cleanCheckbox').checked, normalize_audio: document.getElementById('normalizeAudioCheckbox').checked, speed: parseFloat(document.getElementById('speedSlider').value), pitch: parseFloat(document.getElementById('pitchSlider').value), volume: parseFloat(document.getElementById('volumeSlider').value)}),
+    });
+    if (!res.ok) throw new Error('Generation failed');
+    const data = await res.json();
+    CURRENT_TASK_ID = data.task_id;
+    pollStatus(CURRENT_TASK_ID);
+  } catch (e) { onError(e.message); }
+}
+
+function pollStatus(taskId) {
+  if (POLL_INTERVAL) clearInterval(POLL_INTERVAL);
+  POLL_INTERVAL = setInterval(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/tts/status/${taskId}`);
+      if (!res.ok) throw new Error('Status fetch failed');
+      const data = await res.json();
+      setProgress(data.progress, data.stage || '');
+      renderChunks(data.chunks || []);
+
+      if (data.status === 'chunks_done') {
+        clearInterval(POLL_INTERVAL); POLL_INTERVAL = null;
+        onChunksDone(data);
+      } else if (data.status === 'done') {
+        clearInterval(POLL_INTERVAL); POLL_INTERVAL = null;
+        progressCard.classList.add('hidden');
+        outputCard.classList.remove('hidden');
+        CURRENT_AUDIO_URL = `${API_BASE}${data.audio_url}`;
+        audioPlayer.src = CURRENT_AUDIO_URL; audioPlayer.load();
+        generateBtn.disabled = false; resetBtn.style.display = 'inline-flex'; STATE = 'done';
+      } else if (data.status === 'error') {
+        clearInterval(POLL_INTERVAL); POLL_INTERVAL = null;
+        onError(data.error || 'Unknown error');
+      }
+    } catch (e) {
+      clearInterval(POLL_INTERVAL); POLL_INTERVAL = null;
+      onError(e.message);
+    }
+  }, 500);
+}
+
+function onChunksDone(data) {
+  STATE = 'chunks_done';
+  generateBtn.disabled = false;
+  progressCard.classList.add('hidden');
+  mergeSection.classList.remove('hidden');
+  resetBtn.style.display = 'inline-flex';
+}
+
+function setProgress(pct, label) {
+  progressFill.style.width = Math.min(pct, 100) + '%';
+  progressLabel.textContent = label ? label.replace(/_/g, ' ') + ` ${Math.round(pct)}%` : `${Math.round(pct)}%`;
+}
+
+function onError(msg) {
+  STATE = 'error';
+  generateBtn.disabled = false;
+  progressCard.classList.add('hidden');
+  showError(msg);
+}
+
+mergeBtn.addEventListener('click', async () => {
+  if (!CURRENT_TASK_ID) return;
+  mergeBtn.disabled = true; mergeBtn.textContent = 'Merging...';
+  progressCard.classList.remove('hidden');
+  setProgress(90, 'Merging audio...');
+  try {
+    const res = await fetch(`${API_BASE}/tts/merge`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({task_id: CURRENT_TASK_ID, output_format: 'mp3'}),
+    });
+    if (!res.ok) throw new Error('Merge failed');
+    const data = await res.json();
+    mergeBtn.disabled = false; mergeBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;"><path d="M8 6L21 6"/><path d="M8 12L21 12"/><path d="M8 18L21 18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg> Merge &amp; Download All';
+    mergeSection.classList.add('hidden');
+    progressCard.classList.add('hidden');
+    outputCard.classList.remove('hidden');
+    CURRENT_AUDIO_URL = `${API_BASE}${data.audio_url}`;
+    audioPlayer.src = CURRENT_AUDIO_URL; audioPlayer.load();
+  } catch (e) { showError('Merge: ' + e.message); mergeBtn.disabled = false; mergeBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;"><path d="M8 6L21 6"/><path d="M8 12L21 12"/><path d="M8 18L21 18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg> Merge &amp; Download All'; }
+});
+
+downloadBtn.addEventListener('click', () => {
+  if (!CURRENT_AUDIO_URL) return;
+  const fmt = formatSelect.value;
+  const url = CURRENT_AUDIO_URL + '&format=' + fmt;
+  const a = document.createElement('a');
+  a.href = url; a.download = `tts_output.${fmt}`; a.click();
+});
+
+regenAllBtn.addEventListener('click', () => {
+  outputCard.classList.add('hidden');
+  startGeneration();
+});
+
+resetBtn.addEventListener('click', async () => {
+  if (!CURRENT_TASK_ID) return;
+  if (!confirm('Reset this session? All generated audio will be deleted.')) return;
+  try {
+    await fetch(`${API_BASE}/tts/reset/${CURRENT_TASK_ID}`, { method: 'POST' });
+  } catch (_) {}
+  CURRENT_TASK_ID = null;
+  CURRENT_AUDIO_URL = null;
+  CHUNK_DATA = [];
+  if (POLL_INTERVAL) { clearInterval(POLL_INTERVAL); POLL_INTERVAL = null; }
+  STATE = 'idle';
+  generateBtn.disabled = false;
+  progressCard.classList.add('hidden');
+  outputCard.classList.add('hidden');
+  mergeSection.classList.add('hidden');
+  chunkList.innerHTML = '<div class="no-chunks">Enter text and click Generate to see segments</div>';
+  resetBtn.style.display = 'none';
+  hideError();
+});
+
+/* Dictionary button */
+document.getElementById('dictBtn').addEventListener('click', () => {
+  loadDict();
+  document.getElementById('dictModal').classList.remove('hidden');
+  document.querySelector('#dictModal .dict-tab[data-tab=acronyms]').click();
+});
+document.getElementById('dictCloseBtn').addEventListener('click', () => {
+  document.getElementById('dictModal').classList.add('hidden');
+});
+document.getElementById('dictModal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) document.getElementById('dictModal').classList.add('hidden');
+});
+
+/* Pause modal */
+const PAUSE_LABELS = {'.': 'Period (.)', ',': 'Comma (,)', ';': 'Semicolon (;)', ':': 'Colon (:)', '?': 'Question (?)', '!': 'Exclamation (!)', 'linebreak': 'Line break'};
+
+async function loadPauseConfig() {
+  try {
+    const res = await fetch(`${API_BASE}/tts/pause_config`);
+    const cfg = await res.json();
+    const enabled = cfg.enabled !== false;
+    const pauses = cfg.pauses || {};
+    const toggle = document.getElementById('pauseToggle');
+    toggle.checked = enabled;
+    updatePauseToggleUI(enabled);
+    const container = document.getElementById('pauseSliders');
+    container.innerHTML = Object.keys(pauses).map(k => `
+      <div class="pause-slider-row">
+        <span class="pause-slider-label">${PAUSE_LABELS[k] || k}</span>
+        <input type="range" min="0" max="2" step="0.05" value="${pauses[k]}" data-key="${k}">
+        <span class="pause-slider-val">${pauses[k].toFixed(2)}s</span>
+      </div>`).join('');
+    container.querySelectorAll('input[type=range]').forEach(slider => {
+      slider.addEventListener('input', onPauseSliderChange);
+    });
+  } catch (e) { console.error('Pause load:', e); }
+}
+
+function onPauseSliderChange(e) {
+  const val = parseFloat(e.target.value);
+  e.target.nextElementSibling.textContent = val.toFixed(2) + 's';
+}
+
+function onPauseToggle() {
+  const enabled = document.getElementById('pauseToggle').checked;
+  updatePauseToggleUI(enabled);
+}
+
+function updatePauseToggleUI(enabled) {
+  const label = document.getElementById('pauseToggleLabel');
+  label.textContent = enabled ? 'ON' : 'OFF';
+  document.querySelectorAll('#pauseSliders input').forEach(s => s.disabled = !enabled);
+}
+
+async function savePauseConfig() {
+  const enabled = document.getElementById('pauseToggle').checked;
+  const sliders = document.querySelectorAll('#pauseSliders input[type=range]');
+  const pauses = {};
+  sliders.forEach(s => { pauses[s.dataset.key] = parseFloat(s.value); });
+  try {
+    const r = await fetch(`${API_BASE}/tts/pause_config`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({config: {enabled, pauses}}),
+    });
+    PAUSE_CFG = await r.json();
+    updateCharCount();
+  } catch (e) { console.error('Pause save:', e); }
+}
+
+document.getElementById('pauseBtn').addEventListener('click', () => {
+  loadPauseConfig();
+  document.getElementById('pauseModal').classList.remove('hidden');
+});
+document.getElementById('pauseCloseBtn').addEventListener('click', () => {
+  document.getElementById('pauseModal').classList.add('hidden');
+});
+document.getElementById('pauseSaveBtn').addEventListener('click', async () => {
+  await savePauseConfig();
+  document.getElementById('pauseModal').classList.add('hidden');
+});
+document.getElementById('pauseModal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) document.getElementById('pauseModal').classList.add('hidden');
+});
+
+/* History */
+document.getElementById('historyBtn').addEventListener('click', async () => {
+  const modal = document.getElementById('historyModal');
+  modal.classList.remove('hidden');
+  await loadHistory();
+});
+document.getElementById('historyCloseBtn').addEventListener('click', () => {
+  document.getElementById('historyModal').classList.add('hidden');
+});
+document.getElementById('historyClearBtn').addEventListener('click', async () => {
+  if (!confirm('Clear all history?')) return;
+  await fetch(`${API_BASE}/tts/history`, { method: 'DELETE' });
+  await loadHistory();
+});
+document.getElementById('historyModal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) document.getElementById('historyModal').classList.add('hidden');
+});
+
+async function loadHistory() {
+  try {
+    const res = await fetch(`${API_BASE}/tts/history`);
+    const entries = await res.json();
+    const container = document.getElementById('historyList');
+    if (!entries || entries.length === 0) {
+      container.innerHTML = '<div class="hist-empty">No history yet</div>';
+      return;
+    }
+    container.innerHTML = entries.map((e, i) => {
+      const date = new Date((e.timestamp || 0) * 1000);
+      const timeStr = date.toLocaleString();
+      const txt = (e.text || '').slice(0, 80);
+      return `<div class="hist-item">
+        <div class="hist-info">
+          <div class="hist-text">${escapeHtml(txt)}</div>
+          <div class="hist-meta">${timeStr} &middot; ${e.duration || '?'}s &middot; ${e.voice_id || ''}</div>
+        </div>
+        <div class="hist-actions">
+          <button onclick="playHistory('${e.id}')" title="Play">
+            <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          </button>
+          <button onclick="downloadHistory('${e.id}')" title="Download">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          </button>
+          <button onclick="deleteHistory('${e.id}')" title="Delete">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+      </div>`;
+    }).join('');
+  } catch (e_) { console.error('History:', e_); }
+}
+
+function playHistory(id) {
+  const url = `${API_BASE}/tts/download_file?path=${id}/final.mp3`;
+  const old = document.getElementById('chunkPlayer');
+  if (old) old.remove();
+  const wrap = document.createElement('div');
+  wrap.id = 'chunkPlayer';
+  wrap.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--card-bg);border:1px solid var(--card-border);border-radius:var(--radius-md);padding:10px 18px;box-shadow:var(--shadow-lg);z-index:300;display:flex;align-items:center;gap:12px;';
+  const aud = document.createElement('audio');
+  aud.src = url;
+  aud.controls = true;
+  aud.style.cssText = 'height:34px;';
+  const close = document.createElement('button');
+  close.innerHTML = '&times;';
+  close.style.cssText = 'border:none;background:none;font-size:22px;cursor:pointer;color:var(--text-muted);padding:0 4px;line-height:1;';
+  close.onclick = () => wrap.remove();
+  wrap.appendChild(aud);
+  wrap.appendChild(close);
+  document.body.appendChild(wrap);
+  aud.play().catch(() => {});
+}
+
+function downloadHistory(id) {
+  const a = document.createElement('a');
+  a.href = `${API_BASE}/tts/download_file?path=${id}/final.mp3`;
+  a.download = `tts_${id}.mp3`;
+  a.click();
+}
+
+async function deleteHistory(id) {
+  await fetch(`${API_BASE}/tts/history/${id}`, { method: 'DELETE' });
+  await loadHistory();
+}
+
+/* Chunk rendering */
+function renderChunks(chunks) {
+  if (!chunks || chunks.length === 0) {
+    chunkList.innerHTML = '<div class="no-chunks">No segments yet</div>';
+    chunkCount.textContent = '';
+    chunkPagination.style.display = 'none';
+    return;
+  }
+  CHUNK_DATA = chunks;
+  chunkCount.textContent = `(${chunks.length} segments)`;
+
+  const totalPages = Math.ceil(chunks.length / CHUNK_PER_PAGE);
+  if (CHUNK_PAGE >= totalPages) CHUNK_PAGE = totalPages - 1;
+  if (CHUNK_PAGE < 0) CHUNK_PAGE = 0;
+
+  const start = CHUNK_PAGE * CHUNK_PER_PAGE;
+  const pageChunks = chunks.slice(start, start + CHUNK_PER_PAGE);
+
+  if (totalPages > 1) {
+    chunkPagination.style.display = 'flex';
+    pageInfo.textContent = `${CHUNK_PAGE + 1}/${totalPages}`;
+    pagePrev.disabled = CHUNK_PAGE === 0;
+    pageNext.disabled = CHUNK_PAGE >= totalPages - 1;
+  } else {
+    chunkPagination.style.display = 'none';
+  }
+
+  let html = '';
+  for (const c of pageChunks) {
+    const statusClass = c.status === 'processing' ? 'processing' : c.status === 'done' ? 'done' : c.status === 'error' ? 'error' : '';
+    const icon = c.status === 'pending' ? '&#9679;' : c.status === 'processing' ? '&#9696;' : c.status === 'done' ? '&#10003;' : c.status === 'error' ? '&#10007;' : '&#9679;';
+    const iconColor = c.status === 'pending' ? 'var(--text-muted)' : c.status === 'processing' ? 'var(--accent-primary)' : c.status === 'done' ? 'var(--success)' : 'var(--error)';
+    const preview = c.text.length > 50 ? c.text.slice(0, 50) + '...' : c.text;
+    html += `
+      <div class="chunk-item ${statusClass}" data-index="${c.index}">
+        <div class="chunk-header" onclick="toggleChunk(${c.index})">
+          <span class="chunk-index">${c.index + 1}</span>
+          <span class="chunk-status-icon" style="color:${iconColor}">${icon}</span>
+          <span class="chunk-text-preview">${escapeHtml(preview)}</span>
+          <span class="chunk-actions">
+            ${c.status === 'done' ? `<button onclick="event.stopPropagation();playChunk(${c.index})" title="Play"><svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg></button>` : ''}
+            ${c.status === 'done' || c.status === 'error' ? `<button onclick="event.stopPropagation();retryChunk(${c.index})" title="Retry"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg></button>` : ''}
+            <button onclick="event.stopPropagation();toggleChunk(${c.index})" title="Edit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+          </span>
+        </div>
+        <div class="chunk-body" id="chunkBody_${c.index}">
+          <textarea id="chunkText_${c.index}">${escapeHtml(c.text)}</textarea>
+          <div class="chunk-body-actions">
+            <button class="btn btn-primary btn-sm" onclick="regenChunk(${c.index})">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+              Re-generate
+            </button>
+          </div>
+        </div>
+      </div>`;
+  }
+  chunkList.innerHTML = html;
+}
+
+pagePrev.addEventListener('click', () => { if (CHUNK_PAGE > 0) { CHUNK_PAGE--; renderChunks(CHUNK_DATA); } });
+pageNext.addEventListener('click', () => {
+  const totalPages = Math.ceil(CHUNK_DATA.length / CHUNK_PER_PAGE);
+  if (CHUNK_PAGE < totalPages - 1) { CHUNK_PAGE++; renderChunks(CHUNK_DATA); }
+});
+
+function toggleChunk(index) {
+  const body = document.getElementById(`chunkBody_${index}`);
+  if (body) body.classList.toggle('open');
+}
+
+function escapeHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+function playChunk(index) {
+  const c = CHUNK_DATA.find(x => x.index === index);
+  if (!c || !c.audio_url) return;
+  const old = document.getElementById('chunkPlayer');
+  if (old) old.remove();
+  const wrap = document.createElement('div');
+  wrap.id = 'chunkPlayer';
+  wrap.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--card-bg);border:1px solid var(--card-border);border-radius:var(--radius-md);padding:10px 18px;box-shadow:var(--shadow-lg);z-index:300;display:flex;align-items:center;gap:12px;';
+  const label = document.createElement('span');
+  label.style.cssText = 'font-size:13px;color:var(--text-primary);white-space:nowrap;font-weight:600;';
+  label.textContent = 'Segment ' + (index + 1) + ':';
+  const aud = document.createElement('audio');
+  aud.src = `${API_BASE}${c.audio_url}`;
+  aud.controls = true;
+  aud.style.cssText = 'height:34px;';
+  const close = document.createElement('button');
+  close.innerHTML = '&times;';
+  close.style.cssText = 'border:none;background:none;font-size:22px;cursor:pointer;color:var(--text-muted);padding:0 4px;line-height:1;';
+  close.onclick = () => wrap.remove();
+  wrap.appendChild(label);
+  wrap.appendChild(aud);
+  wrap.appendChild(close);
+  document.body.appendChild(wrap);
+  aud.play().catch(() => {});
+}
+
+async function retryChunk(index) {
+  const ta = document.getElementById(`chunkText_${index}`);
+  const text = ta ? ta.value.trim() : '';
+  if (!text) return;
+  await _regenChunk(index, text);
+}
+
+async function regenChunk(index) {
+  const ta = document.getElementById(`chunkText_${index}`);
+  const text = ta ? ta.value.trim() : '';
+  if (!text) return;
+  await _regenChunk(index, text);
+}
+
+async function _regenChunk(index, text) {
+  if (!CURRENT_TASK_ID) return;
+  try {
+    const res = await fetch(`${API_BASE}/tts/regenerate_chunk`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({task_id: CURRENT_TASK_ID, chunk_index: index, text}),
+    });
+    if (!res.ok) throw new Error('Regen failed');
+    const data = await res.json();
+    const c = CHUNK_DATA.find(x => x.index === index);
+    if (c) { c.status = 'done'; c.audio_url = data.audio_url; c.text = text; }
+    renderChunks(CHUNK_DATA);
+    const statusRes = await fetch(`${API_BASE}/tts/status/${CURRENT_TASK_ID}`);
+    if (statusRes.ok) {
+      const statusData = await statusRes.json();
+      renderChunks(statusData.chunks || []);
+    }
+    showToast('Segment ' + (index + 1) + ' regenerated');
+  } catch (e) { showError('Regen chunk: ' + e.message); }
+}
+
+function showToast(msg) {
+  const old = document.querySelector('.toast');
+  if (old) old.remove();
+  const t = document.createElement('div');
+  t.className = 'toast'; t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 2000);
+}
+
+/* Dictionary */
+function switchDictTab(tab) {
+  document.querySelectorAll('.dict-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  document.getElementById('dictAcronyms').classList.toggle('hidden', tab !== 'acronyms');
+  document.getElementById('dictWords').classList.toggle('hidden', tab !== 'words');
+}
+
+async function loadDict() {
+  try {
+    const [ar, wr] = await Promise.all([
+      fetch(`${API_BASE}/tts/dict/acronyms`).then(r => r.json()),
+      fetch(`${API_BASE}/tts/dict/words`).then(r => r.json()),
+    ]);
+    renderDictTable('acroBody', ar.entries, 'acronyms');
+    renderDictTable('wordBody', wr.entries, 'words');
+  } catch (e) { console.error('Dict load:', e); }
+}
+
+function renderDictTable(bodyId, entries, type) {
+  const body = document.getElementById(bodyId);
+  if (!entries || entries.length === 0) {
+    body.innerHTML = '<tr><td colspan="3" style="color:var(--text-muted);text-align:center;padding:16px;font-size:12px;">No entries yet</td></tr>';
+    return;
+  }
+  body.innerHTML = entries.map((e, i) => `
+    <tr>
+      <td><input type="text" value="${escapeHtml(e.key)}" id="${type}_key_${i}" placeholder="e.g. vtv"></td>
+      <td><input type="text" value="${escapeHtml(e.value)}" id="${type}_val_${i}" placeholder="pronunciation"></td>
+      <td style="white-space:nowrap;">
+        <button class="btn-dict-del" onclick="saveDictRow('${type}', ${i})" title="Save">&#10003;</button>
+        <button class="btn-dict-del" onclick="deleteDictRow('${type}', '${escapeHtml(e.key)}')" title="Delete">&#10005;</button>
+      </td>
+    </tr>`).join('');
+}
+
+async function saveDictRow(type, idx) {
+  const keyEl = document.getElementById(`${type}_key_${idx}`);
+  const valEl = document.getElementById(`${type}_val_${idx}`);
+  const key = keyEl.value.trim();
+  const value = valEl.value.trim();
+  if (!key || !value) { showToast('Both fields required'); return; }
+
+  const endpoint = type === 'acronyms' ? '/tts/dict/acronyms' : '/tts/dict/words';
+  try {
+    const res = await fetch(`${API_BASE}${endpoint}`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({key, value}),
+    });
+    if (!res.ok) throw new Error('Save failed');
+    const data = await res.json();
+    renderDictTable(type === 'acronyms' ? 'acroBody' : 'wordBody', data.entries, type);
+    showToast('Saved');
+  } catch (e) { showToast('Error: ' + e.message); }
+}
+
+async function deleteDictRow(type, key) {
+  const endpoint = type === 'acronyms' ? '/tts/dict/acronyms' : '/tts/dict/words';
+  try {
+    const res = await fetch(`${API_BASE}${endpoint}?key=${encodeURIComponent(key)}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error('Delete failed');
+    const data = await res.json();
+    renderDictTable(type === 'acronyms' ? 'acroBody' : 'wordBody', data.entries, type);
+    showToast('Deleted');
+  } catch (e) { showToast('Error: ' + e.message); }
+}
+
+function addDictRow(type) {
+  const bodyId = type === 'acronyms' ? 'acroBody' : 'wordBody';
+  const body = document.getElementById(bodyId);
+  const idx = body.children.length;
+  body.insertAdjacentHTML('beforeend', `
+    <tr>
+      <td><input type="text" value="" id="${type}_key_${idx}" placeholder="e.g. vtv"></td>
+      <td><input type="text" value="" id="${type}_val_${idx}" placeholder="pronunciation"></td>
+      <td style="white-space:nowrap;">
+        <button class="btn-dict-del" onclick="saveDictRow('${type}', ${idx})" title="Save">&#10003;</button>
+        <button class="btn-dict-del" onclick="this.closest('tr').remove()" title="Cancel">&#10005;</button>
+      </td>
+    </tr>`);
+  document.getElementById(`${type}_key_${idx}`)?.focus();
+}
+
+/* Modal */
+newVoiceBtn.addEventListener('click', () => {
+  voiceLabModal.classList.remove('hidden');
+  cloneVoiceName.value = ''; cloneRefAudio.value = ''; cloneRefAudio.type = 'text'; cloneRefAudio.type = 'file'; cloneRefText.value = '';
+});
+cloneCancelBtn.addEventListener('click', () => voiceLabModal.classList.add('hidden'));
+cloneSaveBtn.addEventListener('click', async () => {
+  const voiceId = cloneVoiceName.value.trim();
+  const audioFile = cloneRefAudio.files[0];
+  const refText = cloneRefText.value.trim();
+  if (!voiceId || !audioFile || !refText) { alert('Fill all fields and select an audio file'); return; }
+  cloneSaveBtn.disabled = true; cloneSaveBtn.textContent = 'Uploading...';
+  try {
+    const fd = new FormData();
+    fd.append('voice_id', voiceId);
+    fd.append('ref_text', refText);
+    fd.append('ref_audio', audioFile);
+    const res = await fetch(`${API_BASE}/tts/clone`, { method: 'POST', body: fd });
+    if (!res.ok) throw new Error('Clone failed');
+    voiceLabModal.classList.add('hidden');
+    await loadVoices(); CURRENT_VOICE_MODE = 'custom'; CURRENT_VOICE_ID = voiceId; updateVoiceLabel();
+    showToast('Voice "' + voiceId + '" cloned');
+  } catch (e) { alert('Error: ' + e.message); }
+  cloneSaveBtn.disabled = false; cloneSaveBtn.textContent = 'Save Voice';
+});
+voiceLabModal.addEventListener('click', e => { if (e.target === voiceLabModal) voiceLabModal.classList.add('hidden'); });
+
+function showError(msg) { errorDisplay.textContent = msg; errorDisplay.classList.remove('hidden'); }
+function hideError() { errorDisplay.classList.add('hidden'); }
+
+updateCharCount(); loadVoices();
+fetch(`${API_BASE}/tts/pause_config`).then(r => r.json()).then(c => { PAUSE_CFG = c; updateCharCount(); }).catch(() => {});
+</script>
+</body>
+</html>
