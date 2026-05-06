@@ -91,8 +91,8 @@ The project does not include model weights. Download and place them according to
 
 | Folder | Contents | Download |
 |--------|----------|----------|
-| `PIPER_DIR` | Piper `.onnx` voice models + `.onnx.json` configs | [Piper voices](https://github.com/rhasspy/piper/blob/master/VOICES.md) |
-| `F5_MODEL_DIR` | F5-TTS checkpoint (`model_last_repo_compatible_weights.pt`) + `vocab.txt` | [F5-TTS-Vietnamese](https://github.com/nguyenthienhy/F5-TTS-Vietnamese) |
+| `PIPER_DIR` | Piper `.onnx` voice models + `.onnx.json` configs | [Hugging face]([https://huggingface.co/Hacht/CapCapResource](https://huggingface.co/Hacht/CapCapResource/tree/main/piper)) |
+| `F5_MODEL_DIR` | F5-TTS checkpoint (`model_last_repo_compatible_weights.pt`) + `vocab.txt` | [Hugging face](https://huggingface.co/Hacht/CapCapResource) |
 | `F5_VOCODER_DIR` | Vocos vocoder (`vocos-mel-24khz`) | Bundled with F5-TTS |
 | `F5_VOICES_DIR` | Reference audio (`.wav`/`.mp3`) + `voices.json` for F5 + OmniVoice voices | [OmniVoice voices.json](https://huggingface.co/splendor1811/omnivoice-vietnamese) |
 | `F5_VOICES_DIR` | Your own cloned voice recordings | Your own recordings |
