@@ -11,6 +11,9 @@ F5_MODEL_DIR = F5_RESOURCE_DIR
 F5_VOICES_DIR = F5_RESOURCE_DIR / "f5_voice"
 F5_VOCODER_DIR = F5_RESOURCE_DIR / "checkpoints" / "vocos-mel-24khz"
 
+# OmniVoice shares the same voice directory as F5 (ref audio + ref text)
+OMNIVOICE_VOICES_DIR = F5_VOICES_DIR
+
 PIPER_DIR = _env_path("PIPER_DIR", r"D:\CodingTime\TTS_Resource\piper")
 
 FFMPEG_DIR = _env_path("FFMPEG_DIR", r"D:\CodingTime\ffmpeg-8.0.1-essentials_build\bin")

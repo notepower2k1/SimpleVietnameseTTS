@@ -338,6 +338,11 @@
     color: var(--accent-gold);
   }
 
+  .voice-engine-badge.omnivoice {
+    background: rgba(184,92,92,0.1);
+    color: var(--error);
+  }
+
   .btn-voice-change {
     display: inline-flex;
     align-items: center;
@@ -1468,8 +1473,9 @@
 
       <div class="card">
         <div class="toggle-group" id="voiceModeToggle">
-          <button class="toggle-btn active" data-mode="preset">Fast Voice</button>
-          <button class="toggle-btn" data-mode="custom">Detail Voice</button>
+          <button class="toggle-btn active" data-mode="low">Low</button>
+          <button class="toggle-btn" data-mode="medium">Medium</button>
+          <button class="toggle-btn" data-mode="high">High</button>
         </div>
         <div class="voice-row">
           <span class="voice-label" id="currentVoiceLabel">Ban Mai <span class="gender-icon">&#9792;</span></span>
@@ -1628,11 +1634,13 @@
         Select Voice
       </h2>
       <div class="dict-tabs">
-        <button class="dict-tab active" data-tab="preset" onclick="switchVoiceTab('preset')">Fast Voice</button>
-        <button class="dict-tab" data-tab="custom" onclick="switchVoiceTab('custom')">Detail Voice</button>
+        <button class="dict-tab active" data-tab="low" onclick="switchVoiceTab('low')">Low — Piper</button>
+        <button class="dict-tab" data-tab="medium" onclick="switchVoiceTab('medium')">Medium — F5</button>
+        <button class="dict-tab" data-tab="high" onclick="switchVoiceTab('high')">High — OmniVoice</button>
       </div>
-      <div id="voiceFastList" style="max-height:380px;overflow-y:auto;"></div>
-      <div id="voiceDetailList" class="hidden" style="max-height:380px;overflow-y:auto;"></div>
+      <div id="voiceLowList" style="max-height:380px;overflow-y:auto;"></div>
+      <div id="voiceMediumList" class="hidden" style="max-height:380px;overflow-y:auto;"></div>
+      <div id="voiceHighList" class="hidden" style="max-height:380px;overflow-y:auto;"></div>
       <div class="modal-actions">
         <button class="btn-cancel" id="voiceCloseBtn">Close</button>
       </div>
@@ -1785,9 +1793,12 @@ function updateCharCount() {
   charCount.textContent = len + label;
 }
 
-let CURRENT_VOICE_MODE = 'preset';
+let CURRENT_VOICE_MODE = 'low';
 let CURRENT_VOICE_ID = 'banmai';
-let ALL_VOICES = {preset: [], custom: []};
+let ALL_VOICES = {low: [], medium: [], high: []};
+
+const QUALITY_LABELS = {low: 'Piper', medium: 'F5', high: 'OmniVoice'};
+const QUALITY_BADGE_CLASS = {low: 'piper', medium: 'f5', high: 'omnivoice'};
 
 voiceModeToggle.addEventListener('click', e => {
   const btn = e.target.closest('.toggle-btn');
@@ -1795,7 +1806,7 @@ voiceModeToggle.addEventListener('click', e => {
   voiceModeToggle.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   CURRENT_VOICE_MODE = btn.dataset.mode;
-  document.getElementById('newVoiceBtn').style.display = CURRENT_VOICE_MODE === 'custom' ? 'inline-block' : 'none';
+  document.getElementById('newVoiceBtn').style.display = (CURRENT_VOICE_MODE === 'medium' || CURRENT_VOICE_MODE === 'high') ? 'inline-block' : 'none';
   const list = ALL_VOICES[CURRENT_VOICE_MODE] || [];
   if (list.length > 0 && !list.find(v => v.id === CURRENT_VOICE_ID)) {
     selectVoice(list[0].id, list[0].label, list[0].gender || '');
@@ -1809,12 +1820,13 @@ async function loadVoices() {
     const res = await fetch(`${API_BASE}/tts/voices`);
     const data = await res.json();
     ALL_VOICES = data;
-    if (data.preset.length && data.preset[0].rate) VOICE_RATES.preset = data.preset[0].rate;
+    if (data.low.length && data.low[0].rate) VOICE_RATES.preset = data.low[0].rate;
     const cr = {};
-    (data.custom || []).forEach(v => { cr[v.id] = v.rate || 18; });
+    (data.medium || []).forEach(v => { cr[v.id] = v.rate || 18; });
+    (data.high || []).forEach(v => { cr[v.id] = v.rate || 8; });
     VOICE_RATES.custom = cr;
-    if (data.preset.length > 0) {
-      selectVoice(data.preset[0].id, data.preset[0].label, data.preset[0].gender || '');
+    if (data.low.length > 0) {
+      selectVoice(data.low[0].id, data.low[0].label, data.low[0].gender || '');
     }
   } catch (e) { console.error(e); }
 }
@@ -1828,9 +1840,8 @@ function updateVoiceLabel() {
   const list = ALL_VOICES[CURRENT_VOICE_MODE] || [];
   const v = list.find(x => x.id === CURRENT_VOICE_ID);
   const genderIcon = v && v.gender === 'male' ? '&#9794;' : v && v.gender === 'female' ? '&#9792;' : '';
-  const engineBadge = CURRENT_VOICE_MODE === 'custom'
-    ? '<span class="voice-engine-badge f5">F5</span>'
-    : '<span class="voice-engine-badge piper">Piper</span>';
+  const badgeClass = QUALITY_BADGE_CLASS[CURRENT_VOICE_MODE] || 'piper';
+  const engineBadge = `<span class="voice-engine-badge ${badgeClass}">${QUALITY_LABELS[CURRENT_VOICE_MODE]}</span>`;
   const label = v ? `${v.label} <span class="gender-icon">${genderIcon}</span>${engineBadge}` : (CURRENT_VOICE_ID || 'Unknown');
   document.getElementById('currentVoiceLabel').innerHTML = label;
 }
@@ -1844,13 +1855,15 @@ function getCurrentVoiceLabel() {
 /* Voice Modal */
 function switchVoiceTab(tab) {
   document.querySelectorAll('#voiceModal .dict-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
-  document.getElementById('voiceFastList').classList.toggle('hidden', tab !== 'preset');
-  document.getElementById('voiceDetailList').classList.toggle('hidden', tab !== 'custom');
+  document.getElementById('voiceLowList').classList.toggle('hidden', tab !== 'low');
+  document.getElementById('voiceMediumList').classList.toggle('hidden', tab !== 'medium');
+  document.getElementById('voiceHighList').classList.toggle('hidden', tab !== 'high');
   renderVoiceList(tab);
 }
 
 function renderVoiceList(mode) {
-  const container = document.getElementById(mode === 'preset' ? 'voiceFastList' : 'voiceDetailList');
+  const containerId = mode === 'low' ? 'voiceLowList' : mode === 'medium' ? 'voiceMediumList' : 'voiceHighList';
+  const container = document.getElementById(containerId);
   const list = ALL_VOICES[mode] || [];
   if (list.length === 0) {
     container.innerHTML = '<div class="hist-empty">No voices available</div>'; return;
@@ -1882,7 +1895,7 @@ function selectVoiceFromCard(mode, id) {
     CURRENT_VOICE_ID = id;
     updateVoiceLabel();
     document.querySelectorAll('#voiceModeToggle .toggle-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
-    document.getElementById('newVoiceBtn').style.display = mode === 'custom' ? 'inline-block' : 'none';
+    document.getElementById('newVoiceBtn').style.display = (mode === 'medium' || mode === 'high') ? 'inline-block' : 'none';
     updateCharCount();
     renderVoiceList(mode);
   }
@@ -1892,11 +1905,11 @@ function previewVoice(mode, id) {
   const list = ALL_VOICES[mode] || [];
   const v = list.find(x => x.id === id);
   if (!v) return;
-  if (mode === 'preset') {
+  if (mode === 'low') {
     const text = 'Xin chào đây là đoạn thử giọng nói, cảm ơn bạn đã lắng nghe.';
     fetch(`${API_BASE}/tts/preview`, {
       method: 'POST', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({text, voice_mode: 'preset', voice_id: id, normalize: false, clean: false, normalize_audio: true, speed: 1, pitch: 0, volume: 0}),
+      body: JSON.stringify({text, voice_mode: 'low', voice_id: id, normalize: false, clean: false, normalize_audio: true, speed: 1, pitch: 0, volume: 0}),
     }).then(r => r.json()).then(data => {
       const wrap = getOrCreateMiniPlayer();
       const aud = wrap.querySelector('audio');
@@ -1904,7 +1917,8 @@ function previewVoice(mode, id) {
       aud.play().catch(() => {});
     }).catch(() => {});
   } else {
-    const url = `${API_BASE}/tts/voice_audio/f5/${id}`;
+    const engine = mode === 'medium' ? 'f5' : 'omnivoice';
+    const url = `${API_BASE}/tts/voice_audio/${engine}/${id}`;
     const wrap = getOrCreateMiniPlayer();
     const aud = wrap.querySelector('audio');
     aud.src = url;
@@ -1936,7 +1950,7 @@ document.getElementById('selectVoiceBtn').addEventListener('click', () => {
   modal.classList.remove('hidden');
   const tab = document.querySelector('#voiceModal .dict-tab.active');
   if (tab) switchVoiceTab(tab.dataset.tab);
-  else switchVoiceTab('preset');
+  else switchVoiceTab('low');
 });
 document.getElementById('voiceCloseBtn').addEventListener('click', () => {
   document.getElementById('voiceModal').classList.add('hidden');

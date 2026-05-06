@@ -39,7 +39,7 @@ from importlib.resources import files
 from config import (
     PIPER_DIR, F5_MODEL_DIR, F5_VOICES_DIR, F5_VOCODER_DIR,
     FFMPEG_DIR, OUTPUT_DIR, PIPER_SAMPLE_RATE, F5_SAMPLE_RATE,
-    CROSS_FADE_MS,
+    CROSS_FADE_MS, OMNIVOICE_VOICES_DIR,
 )
 
 AudioSegment.converter = str(FFMPEG_DIR / "ffmpeg.exe")
@@ -467,7 +467,168 @@ class F5Engine:
         target_text = self._voices_dir / f"{voice_id}.txt"
         with open(target_text, "w", encoding="utf-8") as f:
             f.write(processed_text)
+        self._audio_cache.pop(voice_id, None)
         return voice_id
+
+
+class OmniVoiceEngine:
+    """High-quality Vietnamese TTS using OmniVoice (HuggingFace)."""
+
+    def __init__(self):
+        self.model = None
+        self._voices_dir = OMNIVOICE_VOICES_DIR
+        self._loaded = False
+        self._voice_prompts: dict[str, dict] = {}
+
+    def load(self):
+        if self._loaded:
+            return
+        print("[OmniVoice] Loading model on GPU...")
+        import torch
+        from omnivoice import OmniVoice, OmniVoiceGenerationConfig
+        self.model = OmniVoice.from_pretrained(
+            "splendor1811/omnivoice-vietnamese",
+            device_map="cuda:0",
+            dtype=torch.float16,
+        )
+        self.config = OmniVoiceGenerationConfig(guidance_scale=2.0)
+        print(f"[OmniVoice] Model loaded")
+        self._loaded = True
+
+    def _load_meta(self) -> dict:
+        meta = {}
+        meta_file = self._voices_dir / "voices.json"
+        if meta_file.exists():
+            try:
+                for entry in json.loads(meta_file.read_text(encoding="utf-8")):
+                    vid = Path(entry.get("audio_path", "")).stem
+                    meta[vid] = entry
+            except Exception:
+                pass
+        return meta
+
+    def list_voices(self, include_rate=False) -> list[dict]:
+        meta = self._load_meta()
+        voices = []
+        seen = set()
+        for pattern in ("*.wav", "*.mp3"):
+            for f in sorted(self._voices_dir.glob(pattern)):
+                vid = f.stem
+                if vid in seen:
+                    continue
+                seen.add(vid)
+                m = meta.get(vid, {})
+                label = m.get("name", vid.replace("_", " ").title())
+                v = {
+                    "id": vid, "label": label, "engine": "omnivoice",
+                    "gender": m.get("gender", ""),
+                    "description": m.get("description", ""),
+                    "ref_text": (m.get("text_ref", "") or "")[:100],
+                }
+                if include_rate:
+                    v["rate"] = 8  # OmniVoice is slower
+                voices.append(v)
+        return voices
+
+    def _find_audio(self, voice_id: str) -> Path | None:
+        for ext in (".wav", ".mp3"):
+            p = self._voices_dir / f"{voice_id}{ext}"
+            if p.exists():
+                return p
+        return None
+
+    def _get_ref_text(self, voice_id: str) -> str:
+        meta = self._load_meta()
+        m = meta.get(voice_id, {})
+        if m.get("text_ref"):
+            return m["text_ref"].strip()
+        txt_file = self._voices_dir / f"{voice_id}.txt"
+        if txt_file.exists():
+            return txt_file.read_text(encoding="utf-8").strip()
+        return ""
+
+    def _get_voice_prompt(self, voice_id: str):
+        if voice_id in self._voice_prompts:
+            return self._voice_prompts[voice_id]
+
+        audio_file = self._find_audio(voice_id)
+        ref_text = self._get_ref_text(voice_id)
+        if not audio_file or not ref_text:
+            raise ValueError(f"Voice '{voice_id}' not found")
+
+        prompt = self.model.create_voice_clone_prompt(
+            ref_audio=str(audio_file),
+            ref_text=ref_text,
+        )
+        self._voice_prompts[voice_id] = prompt
+        return prompt
+
+    def synthesize(self, text: str, voice_id: str, speed: float = 1.0) -> AudioSegment:
+        if not self._loaded:
+            self.load()
+
+        prompt = self._get_voice_prompt(voice_id)
+
+        # OmniVoice doesn't support speed directly, but we can adjust via guidance
+        audio = self.model.generate(
+            text=text,
+            language="vietnamese",
+            voice_clone_prompt=prompt,
+            generation_config=self.config,
+        )
+
+        # audio is numpy array [channels, samples] or [samples]
+        wave_np = audio[0] if isinstance(audio, (list, tuple)) else audio
+        if hasattr(wave_np, 'numpy'):
+            wave_np = wave_np.numpy()
+        wave_np = wave_np.astype(np.float32)
+
+        int16_audio = (wave_np * 32767).astype(np.int16)
+        buf = io.BytesIO()
+        with wave.open(buf, "wb") as wf:
+            wf.setnchannels(1)
+            wf.setsampwidth(2)
+            wf.setframerate(24000)
+            wf.writeframes(int16_audio.tobytes())
+        buf.seek(0)
+        return AudioSegment.from_wav(buf)
+
+    def clone_voice(self, ref_audio_path: str, ref_text: str, voice_id: str):
+        """Save reference audio and text for OmniVoice voice cloning."""
+        target_audio = self._voices_dir / f"{voice_id}.wav"
+        shutil.copy(ref_audio_path, target_audio)
+        target_text = self._voices_dir / f"{voice_id}.txt"
+        with open(target_text, "w", encoding="utf-8") as f:
+            f.write(ref_text.strip())
+        # Also update voices.json
+        self._update_voices_json(voice_id, ref_text)
+        # Clear cached prompt so it reloads
+        self._voice_prompts.pop(voice_id, None)
+        return voice_id
+
+    def _update_voices_json(self, voice_id: str, ref_text: str):
+        meta_file = self._voices_dir / "voices.json"
+        entries = []
+        if meta_file.exists():
+            try:
+                entries = json.loads(meta_file.read_text(encoding="utf-8"))
+            except Exception:
+                pass
+        # Check if voice already exists
+        for e in entries:
+            if Path(e.get("audio_path", "")).stem == voice_id:
+                e["text_ref"] = ref_text
+                meta_file.write_text(json.dumps(entries, ensure_ascii=False, indent=2), encoding="utf-8")
+                return
+        # Add new entry
+        entries.append({
+            "name": voice_id.replace("_", " ").title(),
+            "gender": "",
+            "audio_path": f"{voice_id}.wav",
+            "description": "Custom cloned voice",
+            "text_ref": ref_text,
+        })
+        meta_file.write_text(json.dumps(entries, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 class TaskManager:

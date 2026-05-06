@@ -10,3 +10,5 @@ librosa>=0.10.0
 omegaconf>=2.3.0
 vietnormalizer>=0.1.0
 piper-tts>=1.0.0
+omnivoice>=0.1.0
+soundfile>=0.12.0

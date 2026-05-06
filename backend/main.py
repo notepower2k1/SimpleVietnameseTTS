@@ -17,24 +17,31 @@ import json
 
 from config import OUTPUT_DIR, PIPER_DIR, F5_VOICES_DIR
 from tts_engine import (
-    PiperEngine, F5Engine, TaskManager,
+    PiperEngine, F5Engine, OmniVoiceEngine, TaskManager,
     chunk_text_sentences, merge_audio_segments,
-    normalize_vietnamese,
+    normalize_vietnamese, clean_text,
 )
 
-def _synthesize_one(piper_engine, f5_engine, engine_type: str, text: str, voice_id: str, speed: float = 1.0, pitch: float = 0.0, volume: float = 0.0, normalize_audio: bool = True):
-    if engine_type == "custom":
+# ─── Synthesis ───
+
+def _synthesize_one(piper_engine, f5_engine, omnivoice_engine, engine_type: str, text: str, voice_id: str, speed: float = 1.0, pitch: float = 0.0, volume: float = 0.0, normalize_audio: bool = True):
+    if engine_type == "high":
+        audio = omnivoice_engine.synthesize(text, voice_id, speed=speed)
+        sr = 24000
+    elif engine_type == "medium":
         audio = f5_engine.synthesize(text, voice_id, speed=speed)
+        sr = 24000
     else:
         audio = piper_engine.synthesize(text, voice_id, speed=speed)
-    if pitch != 0:
-        sr = 24000 if engine_type == "custom" else 22050
+        sr = 22050
+
+    if pitch != 0 and engine_type != "high":
         import librosa
         import numpy as np
         samples = np.array(audio.get_array_of_samples()).astype(np.float32) / 32768
         shifted = librosa.effects.pitch_shift(samples, sr=sr, n_steps=pitch)
-        audio = AudioSegment( (shifted * 32767).astype(np.int16).tobytes(),
-            frame_rate=sr, sample_width=2, channels=1 )
+        audio = AudioSegment((shifted * 32767).astype(np.int16).tobytes(),
+            frame_rate=sr, sample_width=2, channels=1)
     if normalize_audio:
         target = -20
         if audio.dBFS != float('-inf'):
@@ -44,6 +51,8 @@ def _synthesize_one(piper_engine, f5_engine, engine_type: str, text: str, voice_
         audio = audio.apply_gain(volume)
     return audio
 
+
+# ─── Pause config ───
 
 PAUSE_FILE = Path(__file__).resolve().parent / "custom_dict" / "_pause.json"
 PAUSE_DEFAULTS = {"enabled": True, "pauses": {".": 0.4, ",": 0.2, ";": 0.3, ":": 0.3, "?": 0.4, "!": 0.4, "linebreak": 0.6}}
@@ -76,6 +85,8 @@ def _save_pause_config(cfg: dict):
     PAUSE_FILE.write_text(json.dumps(merged, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
+# ─── Pause-aware synthesis ───
+
 _PAUSE_CHARS = {".", ",", ";", ":", "?", "!"}
 
 def _build_pause_re(pauses: dict):
@@ -84,36 +95,29 @@ def _build_pause_re(pauses: dict):
         return None
     return re.compile(f"([{chars}])")
 
-
 CUSTOM_PAUSE_RE = re.compile(r'\[(\d+(?:\.\d+)?)\s*s\]', re.IGNORECASE)
 
 def normalize_with_pause_protection(text: str) -> str:
-    """Normalize text while preserving [Xs] pause markers.
-    Split on markers, normalize each text segment separately, reassemble."""
     parts = CUSTOM_PAUSE_RE.split(text)
     result = []
     for i, part in enumerate(parts):
         if i % 2 == 0:
-            # Text segment — normalize
             if part.strip():
                 result.append(normalize_vietnamese(part))
             else:
                 result.append(part)
         else:
-            # Captured marker (seconds) — keep as-is
             result.append(f'[{part}s]')
     return ''.join(result)
 
-def synthesize_with_pauses(piper_engine, f5_engine, text: str, engine_type: str, voice_id: str, pause_cfg: dict, speed: float = 1.0, pitch: float = 0.0, volume: float = 0.0, normalize_audio: bool = True):
+def synthesize_with_pauses(piper_engine, f5_engine, omnivoice_engine, text: str, engine_type: str, voice_id: str, pause_cfg: dict, speed: float = 1.0, pitch: float = 0.0, volume: float = 0.0, normalize_audio: bool = True):
     def _synth(t, et, vid):
-        return _synthesize_one(piper_engine, f5_engine, et, t, vid, speed=speed, pitch=pitch, volume=volume, normalize_audio=normalize_audio)
+        return _synthesize_one(piper_engine, f5_engine, omnivoice_engine, et, t, vid, speed=speed, pitch=pitch, volume=volume, normalize_audio=normalize_audio)
 
-    # Split on [Xs] markers, insert silence for markers, synthesize text parts
     marker_parts = CUSTOM_PAUSE_RE.split(text)
     result = AudioSegment.silent(duration=0)
     for mi, mp in enumerate(marker_parts):
         if mi % 2 == 0:
-            # Text part — strip and synthesize with punctuation pauses
             t = mp.strip()
             if not t:
                 continue
@@ -145,7 +149,6 @@ def synthesize_with_pauses(piper_engine, f5_engine, text: str, engine_type: str,
                             result += AudioSegment.silent(duration=int(pauses[merged[j]] * 1000))
                             j += 1
         else:
-            # Captured seconds — insert silence
             try:
                 result += AudioSegment.silent(duration=int(float(mp) * 1000))
             except ValueError:
@@ -155,24 +158,27 @@ def synthesize_with_pauses(piper_engine, f5_engine, text: str, engine_type: str,
     return result
 
 
+# ─── Engines ───
+
 piper_engine = PiperEngine()
 f5_engine = F5Engine()
+omnivoice_engine = OmniVoiceEngine()
 task_manager = TaskManager()
 gpu_lock = asyncio.Lock()
 
-_VALID_VOICE_MODES = {"preset", "custom"}
+_VALID_VOICE_MODES = {"low", "medium", "high"}
 
 def _validate_voice_mode(mode: str) -> str:
     if mode not in _VALID_VOICE_MODES:
-        raise HTTPException(400, f"Invalid voice_mode: {mode}. Must be one of: {', '.join(_VALID_VOICE_MODES)}")
+        raise HTTPException(400, f"Invalid quality: {mode}. Must be one of: low, medium, high")
     return mode
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     f5_engine.load()
+    omnivoice_engine.load()
     yield
-    pass
 
 
 app = FastAPI(title="Simple TTS", lifespan=lifespan)
@@ -192,7 +198,7 @@ def task_dir(task_id: str) -> Path:
 
 class TTSRequest(BaseModel):
     text: str
-    voice_mode: str = "preset"
+    voice_mode: str = "low"
     voice_id: str = "banmai"
     output_format: str = "mp3"
     normalize: bool = False
@@ -214,11 +220,14 @@ class MergeRequest(BaseModel):
     output_format: str = "mp3"
 
 
+# ─── Voices ───
+
 @app.get("/tts/voices")
 async def list_voices():
-    preset = piper_engine.list_voices(include_rate=True)
-    custom = f5_engine.list_voices(include_rate=True)
-    return {"preset": preset, "custom": custom}
+    low = piper_engine.list_voices(include_rate=True)
+    medium = f5_engine.list_voices(include_rate=True)
+    high = omnivoice_engine.list_voices(include_rate=True)
+    return {"low": low, "medium": medium, "high": high}
 
 
 @app.get("/tts/voice_audio/{engine}/{voice_id}")
@@ -227,9 +236,8 @@ async def voice_audio(engine: str, voice_id: str):
         path = PIPER_DIR / f"{voice_id}.onnx"
         if not path.exists():
             raise HTTPException(404, "Voice not found")
-        # Piper has no ref audio — just return OK
         raise HTTPException(400, "Piper uses TTS preview")
-    elif engine == "f5":
+    elif engine in ("f5", "omnivoice"):
         audio_path = None
         for ext in (".wav", ".mp3"):
             p = F5_VOICES_DIR / f"{voice_id}{ext}"
@@ -242,6 +250,8 @@ async def voice_audio(engine: str, voice_id: str):
     raise HTTPException(400, "Unknown engine")
 
 
+# ─── Preview ───
+
 @app.post("/tts/preview")
 async def preview_tts(req: TTSRequest):
     text = req.text.strip()
@@ -252,7 +262,6 @@ async def preview_tts(req: TTSRequest):
     voice_id = req.voice_id or "banmai"
 
     if req.clean:
-        from tts_engine import clean_text
         text = clean_text(text)
     if req.normalize:
         text = normalize_with_pause_protection(text)
@@ -265,9 +274,9 @@ async def preview_tts(req: TTSRequest):
         pause_cfg = _load_pause_config()
         loop = asyncio.get_running_loop()
         def _do():
-            return synthesize_with_pauses(piper_engine, f5_engine, preview_text, engine_type, voice_id, pause_cfg,
+            return synthesize_with_pauses(piper_engine, f5_engine, omnivoice_engine, preview_text, engine_type, voice_id, pause_cfg,
                 speed=req.speed, pitch=req.pitch, volume=req.volume)
-        if engine_type == "custom":
+        if engine_type in ("medium", "high"):
             async with gpu_lock:
                 audio = await loop.run_in_executor(None, _do)
         else:
@@ -285,6 +294,8 @@ async def preview_tts(req: TTSRequest):
         "duration": round(len(audio) / 1000, 2),
     }
 
+
+# ─── Generate ───
 
 @app.post("/tts/generate")
 async def generate_tts(req: TTSRequest):
@@ -320,7 +331,6 @@ async def _run_generation(task_id: str):
     text = task["text"]
     voice_mode = task["voice_mode"]
     voice_id = task["voice_id"]
-    output_format = task["output_format"]
     engine_type = _validate_voice_mode(voice_mode)
     do_normalize = task.get("normalize")
     do_clean = task.get("clean")
@@ -328,7 +338,6 @@ async def _run_generation(task_id: str):
     try:
         await task_manager.update(task_id, status="processing", progress=0, stage="splitting")
         if do_clean:
-            from tts_engine import clean_text
             text = clean_text(text)
         raw_chunks = chunk_text_sentences(text)
         if not raw_chunks:
@@ -343,7 +352,6 @@ async def _run_generation(task_id: str):
                 sents = [s.strip() for s in re.split(r'(?<=[.!?])\s+', p) if s.strip()]
                 para_sentence_counts.append(len(sents))
         is_new_para = []
-        para_start = True
         for count in para_sentence_counts:
             for j in range(count):
                 is_new_para.append(j == 0)
@@ -352,12 +360,6 @@ async def _run_generation(task_id: str):
         gen_texts = list(raw_chunks)
         if do_normalize:
             gen_texts = chunk_text_sentences(normalize_with_pause_protection(text))
-            if len(gen_texts) < len(orig_texts):
-                gen_texts = gen_texts + orig_texts[len(gen_texts):]
-            elif len(gen_texts) > len(orig_texts):
-                gen_texts = gen_texts[:len(orig_texts)]
-        else:
-            gen_texts = list(orig_texts)
             if len(gen_texts) < len(orig_texts):
                 gen_texts = gen_texts + orig_texts[len(gen_texts):]
             elif len(gen_texts) > len(orig_texts):
@@ -374,23 +376,21 @@ async def _run_generation(task_id: str):
 
         await task_manager.update(task_id, status="processing", progress=5, stage="generating")
         loop = asyncio.get_running_loop()
-
         pause_cfg = _load_pause_config()
 
         for i in range(len(orig_texts)):
             await task_manager.update_chunk(task_id, i, status="processing")
             await task_manager.recalc_progress(task_id)
             chunk_gen_text = gen_texts[i]
-
             spd = task.get("speed", 1.0)
             pit = task.get("pitch", 0.0)
             vol = task.get("volume", 0.0)
-
             norm_audio = task.get("normalize_audio", True)
-            def _do_synth(t=chunk_gen_text, et=engine_type, vid=voice_id, pc=pause_cfg, s=spd, p=pit, v=vol, na=norm_audio):
-                return synthesize_with_pauses(piper_engine, f5_engine, t, et, vid, pc, speed=s, pitch=p, volume=v, normalize_audio=na)
 
-            if engine_type == "custom":
+            def _do_synth(t=chunk_gen_text, et=engine_type, vid=voice_id, pc=pause_cfg, s=spd, p=pit, v=vol, na=norm_audio):
+                return synthesize_with_pauses(piper_engine, f5_engine, omnivoice_engine, t, et, vid, pc, speed=s, pitch=p, volume=v, normalize_audio=na)
+
+            if engine_type in ("medium", "high"):
                 async with gpu_lock:
                     seg = await loop.run_in_executor(None, _do_synth)
             else:
@@ -412,12 +412,13 @@ async def _run_generation(task_id: str):
     except Exception as e:
         td = task_dir(task_id)
         if td.exists():
-            # Preserve final files for history
             for f in list(td.iterdir()):
                 if f.name.startswith("chunk_"):
                     f.unlink()
         await task_manager.update(task_id, status="error", error=str(e))
 
+
+# ─── Status ───
 
 @app.get("/tts/status/{task_id}")
 async def get_status(task_id: str):
@@ -447,6 +448,8 @@ async def get_status(task_id: str):
     }
 
 
+# ─── Regenerate chunk ───
+
 @app.post("/tts/regenerate_chunk")
 async def regenerate_chunk(req: ChunkRegenRequest):
     task = await task_manager.get(req.task_id)
@@ -472,8 +475,8 @@ async def regenerate_chunk(req: ChunkRegenRequest):
         na = task.get("normalize_audio", True)
         loop = asyncio.get_running_loop()
         def _do(et=engine_type, t=chunk_gen_text, vid=voice_id, pc=pause_cfg, s=spd, p=pit, v=vol, n_audio=na):
-            return synthesize_with_pauses(piper_engine, f5_engine, t, et, vid, pc, speed=s, pitch=p, volume=v, normalize_audio=n_audio)
-        if engine_type == "custom":
+            return synthesize_with_pauses(piper_engine, f5_engine, omnivoice_engine, t, et, vid, pc, speed=s, pitch=p, volume=v, normalize_audio=n_audio)
+        if engine_type in ("medium", "high"):
             async with gpu_lock:
                 seg = await loop.run_in_executor(None, _do)
         else:
@@ -491,6 +494,8 @@ async def regenerate_chunk(req: ChunkRegenRequest):
         await task_manager.set_chunk_error(req.task_id, req.chunk_index, str(e))
         raise HTTPException(500, str(e))
 
+
+# ─── Merge ───
 
 @app.post("/tts/merge")
 async def merge_chunks(req: MergeRequest):
@@ -521,7 +526,6 @@ async def merge_chunks(req: MergeRequest):
         segments.append(seg)
         chunk_dur = c.get("duration", round(len(seg) / 1000, 3))
 
-        # Build SRT entry
         start_ms = int(total_dur * 1000)
         end_ms = int((total_dur + chunk_dur) * 1000)
         def _ms2srt(ms):
@@ -541,7 +545,6 @@ async def merge_chunks(req: MergeRequest):
     output_path = td / output_filename
     merged.export(str(output_path), format=output_format)
 
-    # Write SRT alongside audio
     srt_path = td / "final.srt"
     with open(srt_path, "w", encoding="utf-8") as f:
         f.write("\n".join(srt_lines))
@@ -558,11 +561,12 @@ async def merge_chunks(req: MergeRequest):
         done_at=asyncio.get_running_loop().time(),
     )
 
-    # Save to history
     await _save_history(req.task_id)
 
     return {"audio_url": f"/tts/download_file?path={req.task_id}/{output_filename}", "duration": duration}
 
+
+# ─── Download ───
 
 @app.get("/tts/download_file")
 async def download_file(path: str = Query(...), format: str = Query("mp3")):
@@ -571,7 +575,6 @@ async def download_file(path: str = Query(...), format: str = Query("mp3")):
         raise HTTPException(404, "File not found")
     target_fmt = format.lower()
 
-    # If requesting SRT, serve .srt file
     if target_fmt == "srt":
         task_id = path.split("/")[0]
         srt_path = OUTPUT_DIR / task_id / "final.srt"
@@ -594,29 +597,28 @@ async def download_file(path: str = Query(...), format: str = Query("mp3")):
     return Response(content=buf.read(), media_type=media_type, headers={"Content-Disposition": f'attachment; filename="tts_output.{target_fmt}"'})
 
 
+# ─── Reset ───
+
 @app.post("/tts/reset/{task_id}")
 async def reset_task(task_id: str):
     task = await task_manager.get(task_id)
     if not task:
         raise HTTPException(404, "Task not found")
     td = task_dir(task_id)
-
-    # Preserve final files for history
     preserved = {}
     if td.exists():
         for name in ("final.mp3", "final.wav", "final.srt"):
             fp = td / name
             if fp.exists():
                 preserved[name] = fp.read_bytes()
-
-        # Remove chunk files only, keep final
         for f in td.iterdir():
             if f.name.startswith("chunk_"):
                 f.unlink()
-
     await task_manager.reset(task_id)
     return {"status": "reset", "preserved_files": list(preserved.keys())}
 
+
+# ─── Clone voice (shared dir for F5 + OmniVoice) ───
 
 UPLOAD_DIR = OUTPUT_DIR / "_uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
@@ -629,7 +631,6 @@ async def clone_voice(voice_id: str = Form(...), ref_text: str = Form(...), ref_
     if not ref_text.strip():
         raise HTTPException(400, "Reference text is required")
 
-    # Save uploaded file
     ext = Path(ref_audio.filename).suffix if ref_audio.filename else ".wav"
     upload_path = UPLOAD_DIR / f"clone_{vid}{ext}"
     content = await ref_audio.read()
@@ -638,11 +639,15 @@ async def clone_voice(voice_id: str = Form(...), ref_text: str = Form(...), ref_
 
     try:
         loop = asyncio.get_running_loop()
+        # Save to shared directory — both F5 and OmniVoice read from here
         await loop.run_in_executor(None, f5_engine.clone_voice, str(upload_path), ref_text, vid)
+        await loop.run_in_executor(None, omnivoice_engine.clone_voice, str(upload_path), ref_text, vid)
         return {"voice_id": vid, "status": "cloned"}
     except Exception as e:
         raise HTTPException(500, str(e))
 
+
+# ─── Dictionary ───
 
 CUSTOM_DICT_DIR = Path(__file__).resolve().parent / "custom_dict"
 CUSTOM_DICT_DIR.mkdir(parents=True, exist_ok=True)
@@ -650,10 +655,6 @@ CUSTOM_DICT_DIR.mkdir(parents=True, exist_ok=True)
 class DictEntry(BaseModel):
     key: str
     value: str
-
-
-class DictEntries(BaseModel):
-    entries: list[DictEntry]
 
 
 def _read_csv(filename: str) -> list[dict]:
@@ -760,6 +761,8 @@ async def delete_word(key: str = Query(...)):
     return {"entries": [{"key": r["original"], "value": r["transliteration"]} for r in rows]}
 
 
+# ─── Pause config ───
+
 class PauseConfigBody(BaseModel):
     config: dict
 
@@ -775,12 +778,13 @@ async def save_pause_config(body: PauseConfigBody):
     return _load_pause_config()
 
 
+# ─── History ───
+
 HISTORY_FILE = Path(__file__).resolve().parent / "custom_dict" / "_history.json"
 MAX_HISTORY = 30
 
 
 async def _save_history(task_id: str):
-    import json
     task = await task_manager.get(task_id)
     if not task or task.get("status") != "done":
         return
@@ -802,7 +806,6 @@ async def _save_history(task_id: str):
             history = json.loads(HISTORY_FILE.read_text(encoding="utf-8"))
         except Exception:
             pass
-    # Remove duplicate if exists
     history = [h for h in history if h.get("id") != task_id]
     history.insert(0, entry)
     history = history[:MAX_HISTORY]
@@ -811,7 +814,6 @@ async def _save_history(task_id: str):
 
 @app.get("/tts/history")
 async def get_history():
-    import json
     if HISTORY_FILE.exists():
         try:
             return json.loads(HISTORY_FILE.read_text(encoding="utf-8"))
@@ -822,7 +824,6 @@ async def get_history():
 
 @app.delete("/tts/history/{history_id}")
 async def delete_history(history_id: str):
-    import json
     history = []
     if HISTORY_FILE.exists():
         try:
@@ -836,10 +837,11 @@ async def delete_history(history_id: str):
 
 @app.delete("/tts/history")
 async def clear_history():
-    import json
     HISTORY_FILE.write_text("[]", encoding="utf-8")
     return {"status": "cleared"}
 
+
+# ─── Frontend ───
 
 FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
 
