@@ -1820,13 +1820,39 @@ async function loadVoices() {
     const res = await fetch(`${API_BASE}/tts/voices`);
     const data = await res.json();
     ALL_VOICES = data;
-    if (data.low.length && data.low[0].rate) VOICE_RATES.preset = data.low[0].rate;
+
+    // Hide quality tiers with no voices
+    ['low','medium','high'].forEach(mode => {
+      const hasVoices = (data[mode] && data[mode].length > 0);
+      const toggleBtn = document.querySelector(`#voiceModeToggle .toggle-btn[data-mode="${mode}"]`);
+      const modalTab = document.querySelector(`#voiceModal .dict-tab[data-tab="${mode}"]`);
+      if (toggleBtn) toggleBtn.style.display = hasVoices ? '' : 'none';
+      if (modalTab) modalTab.style.display = hasVoices ? '' : 'none';
+    });
+
+    // If current mode has no voices, pick first available
+    if (!(ALL_VOICES[CURRENT_VOICE_MODE] && ALL_VOICES[CURRENT_VOICE_MODE].length > 0)) {
+      const available = ['low','medium','high'].find(m => ALL_VOICES[m] && ALL_VOICES[m].length > 0);
+      if (available) {
+        CURRENT_VOICE_MODE = available;
+        document.querySelectorAll('#voiceModeToggle .toggle-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === available));
+      }
+    }
+
+    // Activate first visible toggle if none is active
+    if (!document.querySelector('#voiceModeToggle .toggle-btn.active')) {
+      const first = document.querySelector('#voiceModeToggle .toggle-btn');
+      if (first) { first.classList.add('active'); CURRENT_VOICE_MODE = first.dataset.mode; }
+    }
+
+    if (data.low && data.low.length && data.low[0].rate) VOICE_RATES.preset = data.low[0].rate;
     const cr = {};
     (data.medium || []).forEach(v => { cr[v.id] = v.rate || 18; });
     (data.high || []).forEach(v => { cr[v.id] = v.rate || 8; });
     VOICE_RATES.custom = cr;
-    if (data.low.length > 0) {
-      selectVoice(data.low[0].id, data.low[0].label, data.low[0].gender || '');
+    if (ALL_VOICES[CURRENT_VOICE_MODE] && ALL_VOICES[CURRENT_VOICE_MODE].length > 0) {
+      const first = ALL_VOICES[CURRENT_VOICE_MODE][0];
+      selectVoice(first.id, first.label, first.gender || '');
     }
   } catch (e) { console.error(e); }
 }

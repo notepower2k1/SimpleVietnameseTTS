@@ -359,11 +359,7 @@ async def _run_generation(task_id: str):
         orig_texts = list(raw_chunks)
         gen_texts = list(raw_chunks)
         if do_normalize:
-            gen_texts = chunk_text_sentences(normalize_with_pause_protection(text))
-            if len(gen_texts) < len(orig_texts):
-                gen_texts = gen_texts + orig_texts[len(gen_texts):]
-            elif len(gen_texts) > len(orig_texts):
-                gen_texts = gen_texts[:len(orig_texts)]
+            gen_texts = [normalize_with_pause_protection(c) for c in orig_texts]
 
         chunks_data = []
         for i in range(len(orig_texts)):

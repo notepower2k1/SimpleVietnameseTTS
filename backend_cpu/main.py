@@ -158,7 +158,7 @@ def task_dir(task_id: str) -> Path:
 
 class TTSRequest(BaseModel):
     text: str
-    voice_mode: str = "preset"
+    voice_mode: str = "low"
     voice_id: str = "banmai"
     output_format: str = "mp3"
     normalize: bool = False
@@ -190,7 +190,7 @@ class DictEntry(BaseModel):
 @app.get("/tts/voices")
 async def list_voices():
     preset = piper_engine.list_voices(include_rate=True)
-    return {"preset": preset, "custom": []}
+    return {"low": preset, "medium": [], "high": []}
 
 
 @app.get("/tts/voice_audio/{engine}/{voice_id}")
@@ -244,7 +244,7 @@ async def generate_tts(req: TTSRequest):
         raise HTTPException(400, "Text exceeds 5000 characters")
 
     task_id = await task_manager.create(
-        text=text, voice_mode="preset", voice_id=req.voice_id,
+        text=text, voice_mode=req.voice_mode, voice_id=req.voice_id,
         output_format=req.output_format or "mp3", normalize=req.normalize,
         clean=req.clean, normalize_audio=req.normalize_audio, speed=req.speed,
     )
@@ -287,11 +287,7 @@ async def _run_generation(task_id: str):
         orig_texts = list(raw_chunks)
         gen_texts = list(raw_chunks)
         if do_normalize:
-            gen_texts = chunk_text_sentences(normalize_with_pause_protection(text))
-            if len(gen_texts) < len(orig_texts):
-                gen_texts = gen_texts + orig_texts[len(gen_texts):]
-            elif len(gen_texts) > len(orig_texts):
-                gen_texts = gen_texts[:len(orig_texts)]
+            gen_texts = [normalize_with_pause_protection(c) for c in orig_texts]
 
         chunks_data = []
         for i in range(len(orig_texts)):
