@@ -20,6 +20,6 @@ FFMPEG_DIR = _env_path("FFMPEG_DIR", r"D:\CodingTime\ffmpeg-8.0.1-essentials_bui
 OUTPUT_DIR = PROJECT_ROOT / "backend_cpu" / "outputs"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
-MAX_TEXT_LENGTH = 5000
+MAX_TEXT_LENGTH = 10000
 PIPER_SAMPLE_RATE = 22050
 CROSS_FADE_MS = 50

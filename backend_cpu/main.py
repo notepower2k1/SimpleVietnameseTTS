@@ -246,8 +246,8 @@ async def generate_tts(req: TTSRequest):
     text = req.text.strip()
     if not text:
         raise HTTPException(400, "Text is empty")
-    if len(text) > 5000:
-        raise HTTPException(400, "Text exceeds 5000 characters")
+    if len(text) > 10000:
+        raise HTTPException(400, "Text exceeds 10000 characters")
 
     task_id = await task_manager.create(
         text=text, voice_mode=req.voice_mode, voice_id=req.voice_id,
