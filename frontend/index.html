@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Simple TTS</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Source+Sans+Pro:wght@300;400;600&family=JetBrains+Mono:wght@400&display=swap');
+  @import url('fonts/fonts.css');
 
   :root {
     --bg-primary: #f7f3eb;
@@ -1394,6 +1394,132 @@
     font-family: 'JetBrains Mono', monospace;
   }
 
+  /* Resource loader */
+  .resource-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius-md);
+    margin-bottom: 12px;
+    background: var(--bg-primary);
+    transition: border-color 0.2s ease;
+  }
+
+  .resource-card.loading {
+    border-color: var(--accent-gold);
+    background: rgba(184,148,62,0.04);
+  }
+
+  .resource-card.loaded {
+    border-color: var(--success);
+    background: rgba(107,142,107,0.04);
+  }
+
+  .resource-card.error {
+    border-color: var(--error);
+    background: rgba(184,92,92,0.04);
+  }
+
+  .resource-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .resource-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 2px;
+  }
+
+  .resource-engine {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-family: 'JetBrains Mono', monospace;
+    text-transform: uppercase;
+  }
+
+  .resource-status-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+    font-family: 'JetBrains Mono', monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .resource-status-badge.unloaded {
+    background: rgba(184,92,92,0.1);
+    color: var(--error);
+  }
+
+  .resource-status-badge.loaded {
+    background: rgba(107,142,107,0.12);
+    color: var(--success);
+  }
+
+  .resource-status-badge.loading {
+    background: rgba(184,148,62,0.1);
+    color: var(--accent-gold);
+  }
+
+  .resource-progress-wrap {
+    margin-top: 8px;
+  }
+
+  .resource-progress-bg {
+    height: 6px;
+    background: var(--bg-secondary);
+    border-radius: 3px;
+    overflow: hidden;
+    border: 1px solid var(--card-border);
+  }
+
+  .resource-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent-primary), var(--accent-gold));
+    border-radius: 3px;
+    transition: width 0.3s ease;
+    width: 0;
+  }
+
+  .resource-progress-msg {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 4px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .resource-btn {
+    padding: 8px 16px;
+    border: 1px solid var(--accent-primary);
+    border-radius: var(--radius-sm);
+    background: var(--accent-primary);
+    color: #fff;
+    cursor: pointer;
+    font-size: 13px;
+    font-family: inherit;
+    font-weight: 600;
+    flex-shrink: 0;
+    transition: all 0.2s ease;
+  }
+
+  .resource-btn:hover:not(:disabled) {
+    background: var(--accent-primary-hover);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .resource-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background: var(--text-muted);
+    border-color: var(--text-muted);
+  }
+
   /* Responsive */
   @media (max-width: 900px) {
     .main-layout {
@@ -1430,6 +1556,14 @@
       <button class="btn-icon" id="historyBtn">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3"/></svg>
         History
+      </button>
+      <button class="btn-icon" id="resourceBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg>
+        Resources
+      </button>
+      <button class="btn-icon" id="helpBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+        Guide
       </button>
       <button class="btn-icon danger" id="resetBtn" style="display:none;">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
@@ -1681,10 +1815,116 @@
       </div>
     </div>
   </div>
+
+  <!-- Resource Loader Modal -->
+  <div class="modal-overlay hidden" id="resourceModal">
+    <div class="modal" style="max-width:560px;">
+      <h2>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg>
+        Resources
+      </h2>
+      <div class="dict-tabs">
+        <button class="dict-tab active" data-rtab="download" onclick="switchResourceTab('download')">Download</button>
+        <button class="dict-tab" data-rtab="models" onclick="switchResourceTab('models')">Load Models</button>
+      </div>
+      <div id="resourceDownloadTab"></div>
+      <div id="resourceModelsTab" class="hidden"></div>
+      <div class="modal-actions">
+        <button class="btn-cancel" id="resourceCloseBtn">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Help Modal -->
+<div class="modal-overlay hidden" id="helpModal">
+  <div class="modal" style="max-width:620px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <h2 style="margin:0;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+        How to Use
+      </h2>
+      <button class="btn-icon" id="helpCloseBtn" style="padding:4px 10px;">&#10005; Close</button>
+    </div>
+    <div style="max-height:70vh;overflow-y:auto;padding-right:8px;">
+
+    <div style="font-size:14px;color:var(--text-primary);line-height:1.7;">
+
+    <h3 style="font-family:'Playfair Display',serif;margin:18px 0 6px;font-size:16px;color:var(--accent-primary);">1. First Time Setup</h3>
+    <p>Before using TTS, you need to download the voice models:</p>
+    <ul style="padding-left:20px;margin:6px 0;">
+      <li>Click <strong>Resources</strong> → tab <strong>Download</strong></li>
+      <li>Download <strong>Piper Voices</strong> (Low · CPU, ~848MB) — works on any machine</li>
+      <li>Download <strong>F5-TTS Model</strong> (Medium · GPU, ~1.3GB) — requires NVIDIA GPU</li>
+      <li>Download <strong>OmniVoice Model</strong> (High · GPU, ~2.3GB) — requires NVIDIA GPU 6GB+</li>
+      <li>Files are saved locally in the <code>models/</code> folder — download once, use forever</li>
+    </ul>
+
+    <h3 style="font-family:'Playfair Display',serif;margin:18px 0 6px;font-size:16px;color:var(--accent-primary);">2. Load Models</h3>
+    <ul style="padding-left:20px;margin:6px 0;">
+      <li><strong>Piper</strong> (Low) — loads automatically, no action needed</li>
+      <li><strong>F5-TTS</strong> (Medium) — click Resources → tab <strong>Load Models</strong> → Load F5</li>
+      <li><strong>OmniVoice</strong> (High) — same tab → Load OmniVoice</li>
+      <li>Loading takes 10–60 seconds depending on your GPU</li>
+    </ul>
+
+    <h3 style="font-family:'Playfair Display',serif;margin:18px 0 6px;font-size:16px;color:var(--accent-primary);">3. Generate Speech</h3>
+    <ul style="padding-left:20px;margin:6px 0;">
+      <li>Type or paste your text (max 5000 characters)</li>
+      <li>Select <strong>Low</strong> / <strong>Medium</strong> / <strong>High</strong> quality tier</li>
+      <li>Click <strong>Preview</strong> to hear a sample, or <strong>Generate</strong> for full audio</li>
+      <li>Long text is split into segments — you can replay or regenerate each one</li>
+      <li>Use <strong>Merge &amp; Download All</strong> to combine all segments into one file</li>
+    </ul>
+
+    <h3 style="font-family:'Playfair Display',serif;margin:18px 0 6px;font-size:16px;color:var(--accent-primary);">4. Features</h3>
+    <ul style="padding-left:20px;margin:6px 0;">
+      <li><strong>Dict</strong> — custom pronunciation for acronyms and foreign words</li>
+      <li><strong>Pause</strong> — adjust silence after punctuation, add <code>[1s]</code> markers</li>
+      <li><strong>History</strong> — view and replay past generations</li>
+      <li><strong>Advanced</strong> — speed, pitch, volume sliders</li>
+      <li><strong>Normalize</strong> — auto-clean text and normalize volume</li>
+      <li><strong>Voice Lab</strong> — clone a new voice from reference audio (F5 / OmniVoice)</li>
+    </ul>
+
+    <h3 style="font-family:'Playfair Display',serif;margin:18px 0 6px;font-size:16px;color:var(--accent-primary);">5. Quality Tiers</h3>
+    <table style="width:100%;border-collapse:collapse;font-size:13px;margin:8px 0;">
+      <tr><th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--card-border);color:var(--text-muted);">Tier</th><th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--card-border);color:var(--text-muted);">Engine</th><th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--card-border);color:var(--text-muted);">Speed</th><th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--card-border);color:var(--text-muted);">GPU?</th></tr>
+      <tr><td style="padding:6px 8px;border-bottom:1px solid rgba(212,201,184,0.3);">Low</td><td style="padding:6px 8px;border-bottom:1px solid rgba(212,201,184,0.3);">Piper</td><td style="padding:6px 8px;border-bottom:1px solid rgba(212,201,184,0.3);">Fast</td><td style="padding:6px 8px;border-bottom:1px solid rgba(212,201,184,0.3);">No</td></tr>
+      <tr><td style="padding:6px 8px;border-bottom:1px solid rgba(212,201,184,0.3);">Medium</td><td style="padding:6px 8px;border-bottom:1px solid rgba(212,201,184,0.3);">F5-TTS</td><td style="padding:6px 8px;border-bottom:1px solid rgba(212,201,184,0.3);">Medium</td><td style="padding:6px 8px;border-bottom:1px solid rgba(212,201,184,0.3);">Yes (4GB+)</td></tr>
+      <tr><td style="padding:6px 8px;">High</td><td style="padding:6px 8px;">OmniVoice</td><td style="padding:6px 8px;">Slow</td><td style="padding:6px 8px;">Yes (6GB+)</td></tr>
+    </table>
+
+    <p style="margin-top:12px;font-size:13px;color:var(--text-muted);">
+      <strong>Tip:</strong> Start with Low (Piper) — it works on any machine and is the fastest.
+      Switch to Medium or High for better voice quality if you have a GPU.
+    </p>
+
+    </div>
+  </div>
 </div>
 
 <script>
 const API_BASE = '';
+
+// Detect file:// access — redirect user
+if (location.protocol === 'file:') {
+  document.body.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:sans-serif;padding:20px;">
+      <div style="max-width:500px;text-align:center;">
+        <h2 style="color:#b85c5c;">&#10007; Cannot open directly</h2>
+        <p style="color:#6b5d4f;margin:16px 0;font-size:15px;line-height:1.6;">
+          This app must be accessed through the backend server.
+        </p>
+        <ol style="text-align:left;color:#3d3529;font-size:14px;line-height:1.8;">
+          <li>Run <code>run_api.bat</code> (or <code>run_api_cpu.bat</code>) — keep it running</li>
+          <li>Open your browser to <strong><a href="http://localhost:8000">http://localhost:8000</a></strong></li>
+        </ol>
+      </div>
+    </div>`;
+  throw new Error('File protocol detected — use http://localhost:8000');
+}
+
 let STATE = 'idle';
 let POLL_INTERVAL = null;
 let CURRENT_TASK_ID = null;
@@ -2582,6 +2822,266 @@ voiceLabModal.addEventListener('click', e => { if (e.target === voiceLabModal) v
 
 function showError(msg) { errorDisplay.textContent = msg; errorDisplay.classList.remove('hidden'); }
 function hideError() { errorDisplay.classList.add('hidden'); }
+
+/* Resources modal + Download */
+let RESOURCE_POLL = null;
+let DL_POLL = null;
+
+function getResourceIcon(name, size) {
+  if (name === 'f5' || name === 'f5_model')
+    return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:${size}px;height:${size}px;"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>`;
+  if (name === 'piper')
+    return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:${size}px;height:${size}px;"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>`;
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:${size}px;height:${size}px;"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>`;
+}
+
+function getResourceEngineLabel(name) {
+  if (name === 'piper') return 'CPU · 15 voices';
+  if (name === 'f5') return 'GPU · ~1.4GB';
+  if (name === 'f5_voices') return 'Reference audio';
+  if (name === 'omnivoice') return 'GPU · ~2.3GB';
+  return 'GPU';
+}
+
+// ─── Resource Tab: Download ───
+
+async function loadDownloadTab() {
+  const container = document.getElementById('resourceDownloadTab');
+  container.innerHTML = '<div class="no-chunks" style="padding:20px;">Loading...</div>';
+  try {
+    const [cat, dl] = await Promise.all([
+      fetch(`${API_BASE}/tts/resource_catalog`).then(r => r.json()),
+      fetch(`${API_BASE}/tts/download_progress`).then(r => r.json()),
+    ]);
+    renderDownloadTab(cat, dl);
+  } catch(e) {
+    container.innerHTML = '<div class="no-chunks" style="padding:20px;color:var(--error);">Failed to load catalog. Is the server running?</div>';
+  }
+}
+
+function renderDownloadTab(catalog, dlState) {
+  const container = document.getElementById('resourceDownloadTab');
+  container.innerHTML = catalog.map(r => {
+    const dl = dlState[r.id] || {status: 'none', progress: 0, current_file: '', error: ''};
+    const downloading = dl.status === 'downloading';
+    const done = r.downloaded;
+    const error = dl.status === 'error';
+
+    let btnHtml = '';
+    if (downloading) {
+      btnHtml = `<button class="resource-btn" disabled>Downloading…</button>`;
+    } else if (done) {
+      btnHtml = `<button class="resource-btn" disabled style="background:var(--success);border-color:var(--success);">&#10003; Downloaded</button>`;
+    } else if (error) {
+      btnHtml = `<button class="resource-btn" onclick="startDownload('${r.id}')" style="background:var(--error);border-color:var(--error);">Retry</button>`;
+    } else {
+      btnHtml = `<button class="resource-btn" onclick="startDownload('${r.id}')">Download (${r.total_size_mb}MB)</button>`;
+    }
+
+    let progressHtml = '';
+    if (downloading) {
+      progressHtml = `
+        <div class="resource-progress-wrap">
+          <div class="resource-progress-bg"><div class="resource-progress-fill" style="width:${dl.progress}%"></div></div>
+          <div class="resource-progress-msg">${dl.current_file ? escapeHtml(dl.current_file.split('/').pop()) : 'Starting...'} — ${dl.progress}%</div>
+        </div>`;
+    } else if (error && dl.error) {
+      progressHtml = `<div class="resource-progress-msg" style="color:var(--error);">${escapeHtml(dl.error)}</div>`;
+    }
+
+    const cardClass = done ? 'loaded' : downloading ? 'loading' : error ? 'error' : '';
+    return `<div class="resource-card ${cardClass}">
+      ${getResourceIcon(r.id, 22)}
+      <div class="resource-info">
+        <div class="resource-name">${escapeHtml(r.label)}</div>
+        <div class="resource-engine">${getResourceEngineLabel(r.id)} · ${r.total_size_mb}MB · ${r.existing_files}/${r.total_files} files</div>
+        ${progressHtml}
+      </div>
+      ${btnHtml}
+    </div>`;
+  }).join('') || '<div class="no-chunks">No resources available</div>';
+}
+
+// ─── Resource Tab: Load Models ───
+
+async function loadModelsTab() {
+  const container = document.getElementById('resourceModelsTab');
+  container.innerHTML = '<div class="no-chunks" style="padding:20px;">Loading...</div>';
+  try {
+    const res = await fetch(`${API_BASE}/tts/model_status`);
+    const data = await res.json();
+    renderModelsTab(data);
+  } catch(e) {
+    container.innerHTML = '<div class="no-chunks" style="padding:20px;color:var(--error);">Failed to fetch model status.</div>';
+  }
+}
+
+function renderModelsTab(ms) {
+  const container = document.getElementById('resourceModelsTab');
+  const engines = [
+    {key:'f5', label:'F5-TTS (Medium · GPU)', state: (ms && ms.f5) || {}},
+    {key:'omnivoice', label:'OmniVoice (High · GPU)', state: (ms && ms.omnivoice) || {}},
+  ];
+
+  container.innerHTML = engines.map(e => {
+    const s = e.state;
+    const loaded = s.loaded;
+    const loading = s.loading;
+    const progress = s.progress || 0;
+    const message = s.message || '';
+    const error = s.error;
+    const cardClass = loaded ? 'loaded' : loading ? 'loading' : error ? 'error' : '';
+    const badgeClass = loaded ? 'loaded' : loading ? 'loading' : error ? 'unloaded' : 'unloaded';
+    const badgeText = loaded ? 'Loaded ✓' : loading ? 'Loading...' : error ? 'Error' : 'Not Loaded';
+    const btnDisabled = loaded || loading;
+    const btnText = loaded ? 'Loaded' : loading ? 'Loading...' : 'Load Model';
+
+    let progHtml = '';
+    if (loading) {
+      progHtml = `<div class="resource-progress-wrap"><div class="resource-progress-bg"><div class="resource-progress-fill" style="width:${progress}%"></div></div><div class="resource-progress-msg">${escapeHtml(message)}</div></div>`;
+    } else if (error && message) {
+      progHtml = `<div class="resource-progress-msg" style="color:var(--error);">${escapeHtml(message)}</div>`;
+    }
+
+    return `<div class="resource-card ${cardClass}">
+      ${getResourceIcon(e.key === 'f5' ? 'f5' : 'omnivoice', 22)}
+      <div class="resource-info">
+        <div class="resource-name">${e.label}</div>
+        <span class="resource-status-badge ${badgeClass}">${badgeText}</span>
+        ${progHtml}
+      </div>
+      <button class="resource-btn" ${btnDisabled ? 'disabled' : ''} onclick="loadModel('${e.key}')">${btnText}</button>
+    </div>`;
+  }).join('');
+}
+
+// ─── Tab Switching ───
+
+function switchResourceTab(tab) {
+  document.querySelectorAll('#resourceModal .dict-tab').forEach(b => b.classList.toggle('active', b.dataset.rtab === tab));
+  document.getElementById('resourceDownloadTab').classList.toggle('hidden', tab !== 'download');
+  document.getElementById('resourceModelsTab').classList.toggle('hidden', tab !== 'models');
+  if (tab === 'download') loadDownloadTab();
+  else loadModelsTab();
+}
+
+// ─── Download Actions ───
+
+async function startDownload(rid) {
+  try {
+    const res = await fetch(`${API_BASE}/tts/start_download`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({resource_id: rid}),
+    });
+    if (!res.ok) throw new Error('Start failed');
+    startDownloadPoll();
+  } catch(e) {
+    showToast('Download: ' + e.message);
+  }
+}
+
+function startDownloadPoll() {
+  stopDownloadPoll();
+  DL_POLL = setInterval(async () => {
+    try {
+      const [cat, dl] = await Promise.all([
+        fetch(`${API_BASE}/tts/resource_catalog`).then(r => r.json()),
+        fetch(`${API_BASE}/tts/download_progress`).then(r => r.json()),
+      ]);
+      renderDownloadTab(cat, dl);
+      const allDone = Object.values(dl).every(s => s.status !== 'downloading');
+      if (allDone) {
+        stopDownloadPoll();
+        if (Object.values(dl).some(s => s.status === 'done')) {
+          await loadVoices();
+          showToast('Download complete!');
+        }
+      }
+    } catch(e) { stopDownloadPoll(); }
+  }, 1000);
+}
+
+function stopDownloadPoll() {
+  if (DL_POLL) { clearInterval(DL_POLL); DL_POLL = null; }
+}
+
+// ─── Model Load ───
+
+async function loadModel(model) {
+  try {
+    const res = await fetch(`${API_BASE}/tts/load_model`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({model}),
+    });
+    if (!res.ok) throw new Error('Load failed');
+    const data = await res.json();
+    if (data.status === 'already_loaded') {
+      loadModelsTab();
+      return;
+    }
+    startModelPoll();
+  } catch(e) {
+    showToast('Error: ' + e.message);
+    loadModelsTab();
+  }
+}
+
+function startModelPoll() {
+  stopModelPoll();
+  RESOURCE_POLL = setInterval(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/tts/model_status`);
+      const data = await res.json();
+      renderModelsTab(data);
+      if (!data.f5.loading && !data.omnivoice.loading) {
+        stopModelPoll();
+        if (data.f5.loaded || data.omnivoice.loaded) {
+          await loadVoices();
+          showToast('Model loaded!');
+        }
+      }
+    } catch(e) { stopModelPoll(); }
+  }, 800);
+}
+
+function stopModelPoll() {
+  if (RESOURCE_POLL) { clearInterval(RESOURCE_POLL); RESOURCE_POLL = null; }
+}
+
+// ─── Open / Close ───
+
+async function openResourceModal() {
+  stopDownloadPoll(); stopModelPoll();
+  document.getElementById('resourceModal').classList.remove('hidden');
+  // Activate download tab by default
+  const active = document.querySelector('#resourceModal .dict-tab.active');
+  switchResourceTab(active ? active.dataset.rtab : 'download');
+}
+
+document.getElementById('resourceBtn').addEventListener('click', openResourceModal);
+document.getElementById('resourceCloseBtn').addEventListener('click', () => {
+  stopDownloadPoll(); stopModelPoll();
+  document.getElementById('resourceModal').classList.add('hidden');
+});
+document.getElementById('resourceModal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) {
+    stopDownloadPoll(); stopModelPoll();
+    document.getElementById('resourceModal').classList.add('hidden');
+  }
+});
+
+// Help modal
+document.getElementById('helpBtn').addEventListener('click', () => {
+  document.getElementById('helpModal').classList.remove('hidden');
+});
+document.getElementById('helpCloseBtn').addEventListener('click', () => {
+  document.getElementById('helpModal').classList.add('hidden');
+});
+document.getElementById('helpModal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) document.getElementById('helpModal').classList.add('hidden');
+});
 
 updateCharCount(); loadVoices();
 fetch(`${API_BASE}/tts/pause_config`).then(r => r.json()).then(c => { PAUSE_CFG = c; updateCharCount(); }).catch(() => {});

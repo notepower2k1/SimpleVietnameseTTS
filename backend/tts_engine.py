@@ -39,7 +39,7 @@ from importlib.resources import files
 from config import (
     PIPER_DIR, F5_MODEL_DIR, F5_VOICES_DIR, F5_VOCODER_DIR,
     FFMPEG_DIR, OUTPUT_DIR, PIPER_SAMPLE_RATE, F5_SAMPLE_RATE,
-    CROSS_FADE_MS, OMNIVOICE_VOICES_DIR,
+    CROSS_FADE_MS, OMNIVOICE_VOICES_DIR, OMNIVOICE_MODEL_DIR,
 )
 
 AudioSegment.converter = str(FFMPEG_DIR / "ffmpeg.exe")
@@ -242,10 +242,15 @@ class F5Engine:
         self._loaded = False
         self._audio_cache: dict[str, dict] = {}
 
-    def load(self):
+    def load(self, progress_callback=None):
         if self._loaded:
             return
-        print("[F5] Loading model + vocoder on GPU...")
+        def _report(msg, pct):
+            if progress_callback:
+                progress_callback(msg, pct)
+            print(f"[F5] {msg}")
+
+        _report("Loading F5 model + vocoder...", 10)
         cfg_path = files("f5_tts").joinpath("configs/F5TTS_Base.yaml")
         model_cfg = OmegaConf.load(cfg_path).model
         model_cls = globals()[model_cfg.backbone]
@@ -254,6 +259,7 @@ class F5Engine:
             is_local=True,
             local_path=str(F5_VOCODER_DIR),
         )
+        _report("Vocoder loaded, loading checkpoint...", 30)
         ckpt_path = str(F5_MODEL_DIR / "model_last_repo_compatible_weights.pt")
         vocab_path = str(F5_MODEL_DIR / "vocab.txt")
         self.model = load_model(
@@ -263,20 +269,25 @@ class F5Engine:
             mel_spec_type="vocos",
             vocab_file=vocab_path,
         )
-        print(f"[F5] Model loaded on {f5_device}")
+        _report(f"Model loaded on {f5_device}", 50)
         self._loaded = True
-        self.preload()
+        self.preload(progress_callback=_report)
 
-    def preload(self):
+    def preload(self, progress_callback=None):
         """Pre-compute cond_mel for all voices at startup."""
         import torch
-        for v in self.list_voices():
+        voices = self.list_voices()
+        total = len(voices)
+        for idx, v in enumerate(voices):
             vid = v["id"]
             audio_file = self._find_audio(vid)
             ref_text = self._get_ref_text(vid)
             if audio_file and ref_text:
                 try:
                     self._ensure_audio_cache(vid, audio_file, ref_text)
+                    if progress_callback and total > 0:
+                        pct = 50 + int(50 * (idx + 1) / total)
+                        progress_callback(f"Preloaded voice: {vid}", pct)
                     print(f"  [F5] Preloaded voice: {vid}")
                 except Exception as e:
                     print(f"  [F5] Failed preload {vid}: {e}")
@@ -480,19 +491,35 @@ class OmniVoiceEngine:
         self._loaded = False
         self._voice_prompts: dict[str, dict] = {}
 
-    def load(self):
+    def load(self, progress_callback=None):
         if self._loaded:
             return
-        print("[OmniVoice] Loading model on GPU...")
+        def _report(msg, pct):
+            if progress_callback:
+                progress_callback(msg, pct)
+            print(f"[OmniVoice] {msg}")
+
         import torch
         from omnivoice import OmniVoice, OmniVoiceGenerationConfig
-        self.model = OmniVoice.from_pretrained(
-            "splendor1811/omnivoice-vietnamese",
-            device_map="cuda:0",
-            dtype=torch.float16,
-        )
+
+        # Prefer local model directory if downloaded, else fallback to HuggingFace
+        local_path = OMNIVOICE_MODEL_DIR
+        if local_path.exists() and (local_path / "model.safetensors").exists():
+            _report("Loading OmniVoice model from local path...", 5)
+            self.model = OmniVoice.from_pretrained(
+                str(local_path),
+                device_map="cuda:0",
+                dtype=torch.float16,
+            )
+        else:
+            _report("Downloading OmniVoice model from HuggingFace...", 5)
+            self.model = OmniVoice.from_pretrained(
+                "Hacht/omnivoice-vietnamese",
+                device_map="cuda:0",
+                dtype=torch.float16,
+            )
+        _report("OmniVoice model loaded", 100)
         self.config = OmniVoiceGenerationConfig(guidance_scale=2.0)
-        print(f"[OmniVoice] Model loaded")
         self._loaded = True
 
     def _load_meta(self) -> dict:

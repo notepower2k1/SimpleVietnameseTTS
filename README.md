@@ -35,7 +35,7 @@ A self-hosted Vietnamese Text-to-Speech tool that runs entirely on your machine.
 | Setup | Recommended Version | Notes |
 |-------|---------------------|-------|
 | **GPU (NVIDIA 4GB+)** | `backend/` (GPU version) | All 3 tiers available. OmniVoice needs 4GB+ VRAM. |
-| **GPU (NVIDIA 8GB+)** | `backend/` (GPU version) | Recommended for OmniVoice (High quality). |
+| **GPU (NVIDIA 6GB+)** | `backend/` (GPU version) | Recommended for OmniVoice (High quality). |
 | **CPU only** | `backend_cpu/` (CPU version) | Low tier (Piper) only. Lightweight and fast. |
 | **Mac / AMD** | `backend_cpu/` (CPU version) | F5-TTS and OmniVoice optimized for NVIDIA GPUs. |
 
@@ -45,7 +45,7 @@ A self-hosted Vietnamese Text-to-Speech tool that runs entirely on your machine.
 |------|--------|-------|---------|-------------|
 | **Low** | Piper | ⚡⚡ Fast | Good | No |
 | **Medium** | F5-TTS | ⚡⚡ Medium | Very Good | Yes (4GB+) |
-| **High** | OmniVoice | ⚡ Slow | Best | Yes (4GB+) |
+| **High** | OmniVoice | ⚡ Slow | Best | Yes (6GB+) |
 
 > **Recommendation:** Use the **GPU version** if you have an NVIDIA GPU. OmniVoice (High) gives the best quality but is slower. Piper (Low) runs on any machine.
 
@@ -94,7 +94,7 @@ The project does not include model weights. Download and place them according to
 | `PIPER_DIR` | Piper `.onnx` voice models + `.onnx.json` configs | [Hugging face]([https://huggingface.co/Hacht/CapCapResource](https://huggingface.co/Hacht/CapCapResource/tree/main/piper)) |
 | `F5_MODEL_DIR` | F5-TTS checkpoint (`model_last_repo_compatible_weights.pt`) + `vocab.txt` | [Hugging face](https://huggingface.co/Hacht/CapCapResource) |
 | `F5_VOCODER_DIR` | Vocos vocoder (`vocos-mel-24khz`) | Bundled with F5-TTS |
-| `F5_VOICES_DIR` | Reference audio (`.wav`/`.mp3`) + `voices.json` for F5 + OmniVoice voices | [OmniVoice voices.json](https://huggingface.co/splendor1811/omnivoice-vietnamese) |
+| `F5_VOICES_DIR` | Reference audio (`.wav`/`.mp3`) + `voices.json` for F5 + OmniVoice voices | [OmniVoice voices.json](https://huggingface.co/Hacht/omnivoice-vietnamese) |
 | `F5_VOICES_DIR` | Your own cloned voice recordings | Your own recordings |
 
 > **Note:** F5-TTS and OmniVoice **share the same voice directory**. The `voices.json` file defines available voices with reference audio and text. Both engines read from this shared pool.
@@ -246,7 +246,7 @@ Apache License 2.0. See [LICENSE](./LICENSE).
 
 This project builds on and references the following open-source projects:
 
-- [OmniVoice Vietnamese](https://huggingface.co/splendor1811/omnivoice-vietnamese) — High-quality Vietnamese TTS (High tier)
+- [OmniVoice Vietnamese](https://huggingface.co/Hacht/omnivoice-vietnamese) — High-quality Vietnamese TTS (High tier)
 - [F5-TTS-Vietnamese](https://github.com/nguyenthienhy/F5-TTS-Vietnamese) — Vietnamese voice cloning (Medium tier)
 - [vietnormalizer](https://github.com/nghimestudio/vietnormalizer) — Vietnamese text normalization
 - [piper](https://github.com/rhasspy/piper) — Local text-to-speech synthesis (Low tier)

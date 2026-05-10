@@ -6,15 +6,19 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 def _env_path(key: str, default: str) -> Path:
     return Path(os.environ.get(key, default))
 
-F5_RESOURCE_DIR = _env_path("F5_RESOURCE_DIR", r"D:\CodingTime\TTS_Resource\f5")
+# Default resource dir inside project (portable for other users)
+_DEFAULT_RESOURCE = PROJECT_ROOT / "models"
+
+F5_RESOURCE_DIR = _env_path("F5_RESOURCE_DIR", str(_DEFAULT_RESOURCE / "f5"))
 F5_MODEL_DIR = F5_RESOURCE_DIR
 F5_VOICES_DIR = F5_RESOURCE_DIR / "f5_voice"
 F5_VOCODER_DIR = F5_RESOURCE_DIR / "checkpoints" / "vocos-mel-24khz"
 
 # OmniVoice shares the same voice directory as F5 (ref audio + ref text)
 OMNIVOICE_VOICES_DIR = F5_VOICES_DIR
+OMNIVOICE_MODEL_DIR = F5_RESOURCE_DIR / "omnivoice"
 
-PIPER_DIR = _env_path("PIPER_DIR", r"D:\CodingTime\TTS_Resource\piper")
+PIPER_DIR = _env_path("PIPER_DIR", str(_DEFAULT_RESOURCE / "piper"))
 
 FFMPEG_DIR = _env_path("FFMPEG_DIR", r"D:\CodingTime\ffmpeg-8.0.1-essentials_build\bin")
 

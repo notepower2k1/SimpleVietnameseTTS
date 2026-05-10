@@ -10,12 +10,221 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Query, UploadFile, File, Form
 from fastapi.responses import FileResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from pydub import AudioSegment
 
 import json
 
-from config import OUTPUT_DIR, PIPER_DIR, F5_VOICES_DIR
+from config import OUTPUT_DIR, PIPER_DIR, F5_VOICES_DIR, F5_RESOURCE_DIR, OMNIVOICE_MODEL_DIR
+
+# ─── Resource Download ───
+
+import aiohttp
+import aiofiles
+from huggingface_hub import HfApi
+
+_hf_api = HfApi()
+_dl_state = {}  # resource_id -> {status, progress, current_file, error}
+_dl_lock = asyncio.Lock()
+HF_URL = "https://huggingface.co/{repo}/resolve/main/{path}"
+
+# Piper voices list
+_PIPER_VOICES = [
+    "banmai", "chieuthanh", "cuc", "duyoryx3175", "lacphi",
+    "maiphuong", "manhdung", "minhkhang", "minhquang",
+    "ngochuyen", "ngochuyennew", "phuongtrang", "taian2",
+    "vi_VN-vais1000-medium",
+]
+
+_RESOURCE_DEFS = [
+    {
+        "id": "piper",
+        "label": "Piper Voices (Low · CPU)",
+        "desc": f"{len(_PIPER_VOICES)} Vietnamese voices + configs",
+        "repo_id": "Hacht/CapCapResource",
+        "files": ["piper/voices.json"] + [f"piper/{v}{e}" for v in _PIPER_VOICES for e in [".onnx", ".onnx.json"]],
+        "local_dir": str(PIPER_DIR),
+    },
+    {
+        "id": "f5",
+        "label": "F5-TTS Model (Medium · GPU)",
+        "desc": "Checkpoint + vocab + Vocos vocoder",
+        "repo_id": "Hacht/CapCapResource",
+        "files": [
+            "model_last_repo_compatible_weights.pt",
+            "vocab.txt",
+            "checkpoints/vocos-mel-24khz/pytorch_model.bin",
+            "checkpoints/vocos-mel-24khz/config.yaml",
+        ],
+        "local_dir": str(F5_RESOURCE_DIR),
+    },
+    {
+        "id": "f5_voices",
+        "label": "F5 Voice References",
+        "desc": "Sample voices for cloning demo",
+        "repo_id": "Hacht/CapCapResource",
+        "files": [f"f5_voice/{f}" for f in [
+            "ai_hanh.mp3", "foxy.mp3", "lan.wav", "liam.mp3", "mai.mp3",
+            "ngan_le.mp3", "ngan_nguyen.mp3", "nhat.mp3", "nhu.mp3",
+            "nhung.mp3", "ninh_don.mp3", "phuong.mp3", "quynh_anh.mp3",
+            "tham.mp3", "trieu_duong.mp3", "trung_caha.mp3", "tung.mp3",
+        ]] + ["f5_voice/voices.json"],
+        "local_dir": str(F5_VOICES_DIR),
+    },
+    {
+        "id": "omnivoice",
+        "label": "OmniVoice Model (High · GPU)",
+        "desc": "Model weights + tokenizer (~2.3GB)",
+        "repo_id": "Hacht/omnivoice-vietnamese",
+        "files": [
+            "model.safetensors",
+            "config.json",
+            "tokenizer.json",
+            "tokenizer_config.json",
+            "chat_template.jinja",
+            "train_config.json",
+        ],
+        "local_dir": str(OMNIVOICE_MODEL_DIR),
+    },
+]
+
+async def _get_file_sizes(repo_id: str, paths: list[str]) -> dict[str, int]:
+    """Get file sizes from HuggingFace API."""
+    loop = asyncio.get_running_loop()
+    def _fetch():
+        try:
+            infos = _hf_api.get_paths_info(repo_id, paths)
+            return {i.path: i.size for i in infos if i}
+        except Exception:
+            return {}
+    return await loop.run_in_executor(None, _fetch)
+
+async def _build_catalog():
+    """Build resource catalog with live sizes and download status."""
+    def _local_path(local_dir: Path, repo_path: str) -> Path:
+        parts = Path(repo_path).parts
+        if parts[0] in ("piper", "f5_voice"):
+            return local_dir / Path(*parts[1:])
+        return local_dir / Path(repo_path)
+
+    result = []
+    for rdef in _RESOURCE_DEFS:
+        rid = rdef["id"]
+        sizes = await _get_file_sizes(rdef["repo_id"], rdef["files"])
+        total_size = sum(sizes.values())
+        size_mb = total_size / (1024 * 1024)
+
+        local_dir = Path(rdef["local_dir"])
+        existing = []
+        missing = []
+        for fp in rdef["files"]:
+            target = _local_path(local_dir, fp)
+            if target.exists():
+                existing.append(fp)
+            else:
+                missing.append(fp)
+
+        async with _dl_lock:
+            dl_info = _dl_state.get(rid, {"status": "none", "progress": 0, "current_file": "", "error": ""})
+
+        result.append({
+            "id": rid,
+            "label": rdef["label"],
+            "desc": rdef["desc"],
+            "total_files": len(rdef["files"]),
+            "existing_files": len(existing),
+            "total_size_mb": round(size_mb, 1),
+            "downloaded": len(missing) == 0,
+            "status": dl_info["status"],
+            "progress": dl_info["progress"],
+            "current_file": dl_info["current_file"],
+            "error": dl_info.get("error", ""),
+        })
+    return result
+
+async def _download_resource(rid: str):
+    """Background task: download all files for a resource."""
+    def _local_path(local_dir: Path, repo_path: str) -> Path:
+        parts = Path(repo_path).parts
+        if parts[0] in ("piper", "f5_voice"):
+            return local_dir / Path(*parts[1:])
+        return local_dir / Path(repo_path)
+
+    rdef = next((r for r in _RESOURCE_DEFS if r["id"] == rid), None)
+    if not rdef:
+        return
+
+    local_dir = Path(rdef["local_dir"])
+    repo_id = rdef["repo_id"]
+    files = rdef["files"]
+
+    # Get sizes for progress calculation
+    sizes = await _get_file_sizes(repo_id, files)
+    total_bytes = sum(sizes.values())
+    downloaded_bytes = 0
+
+    # Count already-downloaded bytes
+    for fp in files:
+        target = _local_path(local_dir, fp)
+        if target.exists():
+            downloaded_bytes += sizes.get(fp, 0)
+
+    async with _dl_lock:
+        _dl_state[rid] = {"status": "downloading", "progress": 0, "current_file": "", "error": ""}
+
+    try:
+        for fp in files:
+            # Check if already downloaded
+            target = _local_path(local_dir, fp)
+            if target.exists():
+                # Skip existing files (they might be from a previous download)
+                if total_bytes > 0:
+                    async with _dl_lock:
+                        _dl_state[rid]["progress"] = int(downloaded_bytes * 100 / total_bytes)
+                continue
+
+            # Ensure parent dir exists
+            target.parent.mkdir(parents=True, exist_ok=True)
+
+            url = HF_URL.format(repo=repo_id, path=fp)
+            async with _dl_lock:
+                _dl_state[rid]["current_file"] = fp
+
+            # Download with progress
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url) as resp:
+                    resp.raise_for_status()
+                    file_size = int(resp.headers.get("Content-Length", 0))
+                    async with aiofiles.open(str(target), "wb") as f:
+                        read_bytes = 0
+                        while True:
+                            chunk = await resp.content.read(65536)
+                            if not chunk:
+                                break
+                            await f.write(chunk)
+                            read_bytes += len(chunk)
+                            if total_bytes > 0:
+                                async with _dl_lock:
+                                    _dl_state[rid]["progress"] = int((downloaded_bytes + read_bytes) * 100 / total_bytes)
+                    downloaded_bytes += file_size or read_bytes
+
+        async with _dl_lock:
+            _dl_state[rid] = {"status": "done", "progress": 100, "current_file": "", "error": ""}
+
+        # Refresh the engine voice lists
+        if rid == "piper":
+            piper_engine._meta = piper_engine._load_meta()
+        elif rid in ("f5", "f5_voices"):
+            f5_engine._audio_cache.clear()
+        elif rid == "omnivoice":
+            omnivoice_engine._loaded = False
+            omnivoice_engine._voice_prompts.clear()
+
+    except Exception as e:
+        async with _dl_lock:
+            _dl_state[rid] = {"status": "error", "progress": 0, "current_file": "", "error": str(e)}
+
 from tts_engine import (
     PiperEngine, F5Engine, OmniVoiceEngine, TaskManager,
     chunk_text_sentences, merge_audio_segments,
@@ -165,6 +374,11 @@ f5_engine = F5Engine()
 omnivoice_engine = OmniVoiceEngine()
 task_manager = TaskManager()
 gpu_lock = asyncio.Lock()
+_load_lock = asyncio.Lock()
+_load_state = {
+    "f5": {"loaded": False, "loading": False, "progress": 0, "message": "", "error": False},
+    "omnivoice": {"loaded": False, "loading": False, "progress": 0, "message": "", "error": False},
+}
 
 _VALID_VOICE_MODES = {"low", "medium", "high"}
 
@@ -176,8 +390,6 @@ def _validate_voice_mode(mode: str) -> str:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    f5_engine.load()
-    omnivoice_engine.load()
     yield
 
 
@@ -248,6 +460,86 @@ async def voice_audio(engine: str, voice_id: str):
             raise HTTPException(404, "Audio not found")
         return FileResponse(str(audio_path), media_type="audio/mpeg" if audio_path.suffix == ".mp3" else "audio/wav")
     raise HTTPException(400, "Unknown engine")
+
+
+# ─── Resource Download ───
+
+@app.get("/tts/resource_catalog")
+async def resource_catalog():
+    return await _build_catalog()
+
+
+class StartDownloadRequest(BaseModel):
+    resource_id: str
+
+
+@app.post("/tts/start_download")
+async def start_download(req: StartDownloadRequest):
+    rid = req.resource_id
+    rdef = next((r for r in _RESOURCE_DEFS if r["id"] == rid), None)
+    if not rdef:
+        raise HTTPException(400, f"Unknown resource: {rid}")
+
+    async with _dl_lock:
+        if _dl_state.get(rid, {}).get("status") == "downloading":
+            return {"status": "already_downloading"}
+
+    asyncio.create_task(_download_resource(rid))
+    return {"status": "started"}
+
+
+@app.get("/tts/download_progress")
+async def download_progress():
+    async with _dl_lock:
+        return dict(_dl_state)
+
+
+# ─── Model Loading ───
+
+@app.get("/tts/model_status")
+async def model_status():
+    _load_state["f5"]["loaded"] = f5_engine._loaded
+    _load_state["omnivoice"]["loaded"] = omnivoice_engine._loaded
+    return {
+        "f5": dict(_load_state["f5"]),
+        "omnivoice": dict(_load_state["omnivoice"]),
+    }
+
+class LoadModelRequest(BaseModel):
+    model: str  # "f5" or "omnivoice"
+
+@app.post("/tts/load_model")
+async def load_model(req: LoadModelRequest):
+    if req.model not in ("f5", "omnivoice"):
+        raise HTTPException(400, "Model must be 'f5' or 'omnivoice'")
+
+    engine = f5_engine if req.model == "f5" else omnivoice_engine
+    state_key = "f5" if req.model == "f5" else "omnivoice"
+
+    if engine._loaded:
+        _load_state[state_key] = {"loaded": True, "loading": False, "progress": 100, "message": "Already loaded", "error": False}
+        return {"status": "already_loaded"}
+
+    async with _load_lock:
+        if _load_state[state_key]["loading"]:
+            return {"status": "already_loading"}
+
+        _load_state[state_key] = {"loaded": False, "loading": True, "progress": 0, "message": "Starting...", "error": False}
+
+    async def _load_in_background():
+        def progress_cb(msg, pct):
+            _load_state[state_key] = {"loaded": False, "loading": True, "progress": pct, "message": msg, "error": False}
+
+        loop = asyncio.get_running_loop()
+        try:
+            async with gpu_lock:
+                await loop.run_in_executor(None, engine.load, progress_cb)
+            _load_state[state_key] = {"loaded": True, "loading": False, "progress": 100, "message": "Loaded", "error": False}
+        except Exception as e:
+            _load_state[state_key] = {"loaded": False, "loading": False, "progress": 0, "message": f"Error: {e}", "error": True}
+
+    asyncio.create_task(_load_in_background())
+    return {"status": "loading"}
 
 
 # ─── Preview ───
@@ -840,6 +1132,9 @@ async def clear_history():
 # ─── Frontend ───
 
 FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
+FONTS_DIR = FRONTEND_DIR / "fonts"
+
+app.mount("/fonts", StaticFiles(directory=str(FONTS_DIR)), name="fonts")
 
 @app.get("/")
 async def root():

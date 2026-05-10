@@ -11,8 +11,14 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from pydub import AudioSegment
+
+import json
+import aiohttp
+import aiofiles
+from huggingface_hub import HfApi
 
 from config import OUTPUT_DIR, PIPER_DIR
 from tts_engine import (
@@ -509,6 +515,148 @@ async def reset_task(task_id: str):
     return {"status": "reset", "preserved_files": list(preserved.keys())}
 
 
+# ─── Resource Download ───
+
+_hf_api = HfApi()
+_dl_state = {}
+_dl_lock = asyncio.Lock()
+HF_URL = "https://huggingface.co/{repo}/resolve/main/{path}"
+
+_PIPER_VOICES = [
+    "banmai", "chieuthanh", "cuc", "duyoryx3175", "lacphi",
+    "maiphuong", "manhdung", "minhkhang", "minhquang",
+    "ngochuyen", "ngochuyennew", "phuongtrang", "taian2",
+    "vi_VN-vais1000-medium",
+]
+
+_RESOURCE_DEFS = [
+    {
+        "id": "piper",
+        "label": "Piper Voices (Low · CPU)",
+        "repo_id": "Hacht/CapCapResource",
+        "files": ["piper/voices.json"] + [f"piper/{v}{e}" for v in _PIPER_VOICES for e in [".onnx", ".onnx.json"]],
+        "local_dir": str(PIPER_DIR),
+    },
+]
+
+def _local_path(local_dir: Path, repo_path: str) -> Path:
+    parts = Path(repo_path).parts
+    if parts[0] in ("piper", "f5_voice"):
+        return local_dir / Path(*parts[1:])
+    return local_dir / Path(repo_path)
+
+async def _get_file_sizes(repo_id, paths):
+    loop = asyncio.get_running_loop()
+    def _fetch():
+        try:
+            infos = _hf_api.get_paths_info(repo_id, paths)
+            return {i.path: i.size for i in infos if i}
+        except Exception:
+            return {}
+    return await loop.run_in_executor(None, _fetch)
+
+async def _build_catalog():
+    result = []
+    for rdef in _RESOURCE_DEFS:
+        rid = rdef["id"]
+        sizes = await _get_file_sizes(rdef["repo_id"], rdef["files"])
+        total_size = sum(sizes.values())
+        size_mb = total_size / (1024 * 1024)
+        local_dir = Path(rdef["local_dir"])
+        existing = sum(1 for fp in rdef["files"] if _local_path(local_dir, fp).exists())
+        async with _dl_lock:
+            dl_info = _dl_state.get(rid, {"status":"none","progress":0,"current_file":"","error":""})
+        result.append({
+            "id": rid, "label": rdef["label"], "desc": "",
+            "total_files": len(rdef["files"]), "existing_files": existing,
+            "total_size_mb": round(size_mb, 1),
+            "downloaded": existing == len(rdef["files"]),
+            "status": dl_info["status"], "progress": dl_info["progress"],
+            "current_file": dl_info["current_file"], "error": dl_info.get("error",""),
+        })
+    return result
+
+async def _download_resource(rid: str):
+    rdef = next((r for r in _RESOURCE_DEFS if r["id"] == rid), None)
+    if not rdef:
+        return
+    local_dir = Path(rdef["local_dir"])
+    repo_id = rdef["repo_id"]
+    files = rdef["files"]
+    sizes = await _get_file_sizes(repo_id, files)
+    total_bytes = sum(sizes.values())
+    downloaded_bytes = sum(sizes.get(fp,0) for fp in files if _local_path(local_dir, fp).exists())
+    async with _dl_lock:
+        _dl_state[rid] = {"status":"downloading","progress":0,"current_file":"","error":""}
+    try:
+        for fp in files:
+            target = _local_path(local_dir, fp)
+            if target.exists():
+                continue
+            target.parent.mkdir(parents=True, exist_ok=True)
+            url = HF_URL.format(repo=repo_id, path=fp)
+            async with _dl_lock:
+                _dl_state[rid]["current_file"] = fp
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url) as resp:
+                    resp.raise_for_status()
+                    async with aiofiles.open(str(target), "wb") as f:
+                        while True:
+                            chunk = await resp.content.read(65536)
+                            if not chunk:
+                                break
+                            await f.write(chunk)
+                            if total_bytes > 0:
+                                async with _dl_lock:
+                                    _dl_state[rid]["progress"] = int(downloaded_bytes * 100 / total_bytes)
+        async with _dl_lock:
+            _dl_state[rid] = {"status":"done","progress":100,"current_file":"","error":""}
+    except Exception as e:
+        async with _dl_lock:
+            _dl_state[rid] = {"status":"error","progress":0,"current_file":"","error":str(e)}
+
+@app.get("/tts/resource_catalog")
+async def resource_catalog():
+    return await _build_catalog()
+
+class StartDownloadRequest(BaseModel):
+    resource_id: str
+
+@app.post("/tts/start_download")
+async def start_download(req: StartDownloadRequest):
+    rid = req.resource_id
+    rdef = next((r for r in _RESOURCE_DEFS if r["id"] == rid), None)
+    if not rdef:
+        raise HTTPException(400, f"Unknown resource: {rid}")
+    async with _dl_lock:
+        if _dl_state.get(rid, {}).get("status") == "downloading":
+            return {"status":"already_downloading"}
+    asyncio.create_task(_download_resource(rid))
+    return {"status":"started"}
+
+@app.get("/tts/download_progress")
+async def download_progress():
+    async with _dl_lock:
+        return dict(_dl_state)
+
+
+# ─── Model Status (CPU stub — GPU models not available) ───
+
+@app.get("/tts/model_status")
+async def model_status():
+    return {
+        "f5": {"loaded":False,"loading":False,"progress":0,"message":"GPU required","error":True},
+        "omnivoice": {"loaded":False,"loading":False,"progress":0,"message":"GPU required","error":True},
+    }
+
+class LoadModelRequest(BaseModel):
+    model: str
+
+@app.post("/tts/load_model")
+async def load_model(req: LoadModelRequest):
+    raise HTTPException(400, "GPU required — use backend/ (GPU version) for F5-TTS / OmniVoice")
+
+
 # Dictionary endpoints
 CUSTOM_DICT_DIR = Path(__file__).resolve().parent / "custom_dict"
 CUSTOM_DICT_DIR.mkdir(parents=True, exist_ok=True)
@@ -687,6 +835,9 @@ async def clear_history():
 
 # Serve frontend
 FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
+FONTS_DIR = FRONTEND_DIR / "fonts"
+
+app.mount("/fonts", StaticFiles(directory=str(FONTS_DIR)), name="fonts")
 
 @app.get("/")
 async def root():
