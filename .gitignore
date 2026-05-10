@@ -16,3 +16,6 @@ build/
 .vscode/
 .idea/
 local
+bin
+*.bat
+*.exe

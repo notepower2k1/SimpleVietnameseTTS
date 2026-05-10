@@ -2070,6 +2070,14 @@ async function loadVoices() {
       if (modalTab) modalTab.style.display = hasVoices ? '' : 'none';
     });
 
+    // If no voices at all, show a "download needed" message
+    if (!anyVoiceExists()) {
+      document.getElementById('currentVoiceLabel').innerHTML =
+        '<span style="color:var(--accent-gold);font-size:13px;">&#9888; Download voices in Resources tab</span>';
+      document.querySelectorAll('#voiceModeToggle .toggle-btn').forEach(b => b.style.display = '');
+      return;
+    }
+
     // If current mode has no voices, pick first available
     if (!(ALL_VOICES[CURRENT_VOICE_MODE] && ALL_VOICES[CURRENT_VOICE_MODE].length > 0)) {
       const available = ['low','medium','high'].find(m => ALL_VOICES[m] && ALL_VOICES[m].length > 0);
@@ -2102,7 +2110,16 @@ function selectVoice(id, label, gender) {
   updateVoiceLabel();
 }
 
+function anyVoiceExists() {
+  return ['low','medium','high'].some(m => ALL_VOICES[m] && ALL_VOICES[m].length > 0);
+}
+
 function updateVoiceLabel() {
+  if (!anyVoiceExists()) {
+    document.getElementById('currentVoiceLabel').innerHTML =
+      '<span style="color:var(--accent-gold);font-size:13px;">&#9888; Go to Resources to download voices</span>';
+    return;
+  }
   const list = ALL_VOICES[CURRENT_VOICE_MODE] || [];
   const v = list.find(x => x.id === CURRENT_VOICE_ID);
   const genderIcon = v && v.gender === 'male' ? '&#9794;' : v && v.gender === 'female' ? '&#9792;' : '';

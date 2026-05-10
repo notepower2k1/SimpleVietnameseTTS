@@ -13,6 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from pydub import AudioSegment
+import sys
 
 import json
 
@@ -393,7 +394,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="CapCap TTS", lifespan=lifespan)
+app = FastAPI(title="Simple TTS", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -1131,7 +1132,12 @@ async def clear_history():
 
 # ─── Frontend ───
 
-FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
+# Serve frontend
+if getattr(sys, 'frozen', False):
+    BASE_DIR = Path(sys._MEIPASS)
+else:
+    BASE_DIR = Path(__file__).resolve().parent.parent
+FRONTEND_DIR = BASE_DIR / "frontend"
 FONTS_DIR = FRONTEND_DIR / "fonts"
 
 app.mount("/fonts", StaticFiles(directory=str(FONTS_DIR)), name="fonts")
@@ -1142,5 +1148,13 @@ async def root():
 
 
 if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    try:
+        import uvicorn
+        reload_enabled = not getattr(sys, 'frozen', False)
+        uvicorn.run(app, host="0.0.0.0", port=8000, reload=reload_enabled)
+    except Exception as e:
+        import traceback
+        with open("error.log", "w") as f:
+            traceback.print_exc(file=f)
+        print(f"\nFATAL: {e}\nSee error.log for details.")
+        os.system("pause")
