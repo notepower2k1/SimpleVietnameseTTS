@@ -1,14 +1,14 @@
-# Simple TTS — Vietnamese Text-to-Speech
+# CapCap TTS — Vietnamese Text-to-Speech
 
 > **100% Free · 100% Local · No API Keys · No Cloud · No Limits**
 
 A self-hosted Vietnamese Text-to-Speech tool that runs entirely on your machine. No subscriptions, no usage quotas, no data sent to external servers. Your text and audio never leave your computer.
 
-![Simple TTS UI](./screenshot.jpg)
+![CapCap TTS UI](./screenshot.jpg)
 
 ## Why Local & Free?
 
-| | Cloud TTS (Google, Azure, etc.) | Simple TTS |
+| | Cloud TTS (Google, Azure, etc.) | CapCap TTS |
 |---|---|---|
 | **Cost** | Pay per character / minute | **Free forever** |
 | **Privacy** | Text sent to external servers | **100% local, offline** |

@@ -393,7 +393,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="Simple TTS", lifespan=lifespan)
+app = FastAPI(title="CapCap TTS", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],

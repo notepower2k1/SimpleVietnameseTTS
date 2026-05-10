@@ -259,6 +259,44 @@ class F5Engine:
             is_local=True,
             local_path=str(F5_VOCODER_DIR),
         )
+        # Patch Vocos backbone: fix LayerNorm weight broadcast for [B,C,T] input
+        import torch.nn.functional as _F
+        import vocos.models as _vm
+        import vocos.heads as _vh
+        import vocos.pretrained as _vp
+
+        def _patch_backbone(bb, x, **kwargs):
+            x = bb.embed(x)
+            x = x.permute(0, 2, 1)
+            x = _F.layer_norm(x, bb.norm.normalized_shape, bb.norm.weight, bb.norm.bias, bb.norm.eps)
+            for cb in bb.convnext:
+                x = cb(x, cond_embedding_id=None)
+            x = _F.layer_norm(x, bb.final_layer_norm.normalized_shape, bb.final_layer_norm.weight, bb.final_layer_norm.bias, bb.final_layer_norm.eps)
+            return x.permute(0, 2, 1)
+
+        def _patch_convnext(bb, x, cond_embedding_id=None):
+            r = x
+            x = x.permute(0, 2, 1)
+            x = bb.dwconv(x)
+            x = x.permute(0, 2, 1)
+            x = _F.layer_norm(x, bb.norm.normalized_shape, bb.norm.weight, bb.norm.bias, bb.norm.eps)
+            x = bb.pwconv1(x)
+            x = bb.act(x)
+            x = bb.pwconv2(x)
+            if bb.gamma is not None:
+                x = bb.gamma * x
+            return r + x
+
+        def _patch_head(bb, x):
+            x = torch.matmul(bb.out.weight.data, x) + bb.out.bias.data.view(-1, 1)
+            mag, p = x.chunk(2, dim=1)
+            mag = torch.exp(mag).clip(max=1e2)
+            spec = torch.complex(mag * torch.cos(p), mag * torch.sin(p))
+            return bb.istft(spec)
+
+        _vm.VocosBackbone.forward = _patch_backbone
+        _vm.ConvNeXtBlock.forward = _patch_convnext
+        _vh.ISTFTHead.forward = _patch_head
         _report("Vocoder loaded, loading checkpoint...", 30)
         ckpt_path = str(F5_MODEL_DIR / "model_last_repo_compatible_weights.pt")
         vocab_path = str(F5_MODEL_DIR / "vocab.txt")
