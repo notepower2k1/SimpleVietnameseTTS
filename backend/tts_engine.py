@@ -259,44 +259,6 @@ class F5Engine:
             is_local=True,
             local_path=str(F5_VOCODER_DIR),
         )
-        # Patch Vocos backbone: fix LayerNorm weight broadcast for [B,C,T] input
-        import torch.nn.functional as _F
-        import vocos.models as _vm
-        import vocos.heads as _vh
-        import vocos.pretrained as _vp
-
-        def _patch_backbone(bb, x, **kwargs):
-            x = bb.embed(x)
-            x = x.permute(0, 2, 1)
-            x = _F.layer_norm(x, bb.norm.normalized_shape, bb.norm.weight, bb.norm.bias, bb.norm.eps)
-            for cb in bb.convnext:
-                x = cb(x, cond_embedding_id=None)
-            x = _F.layer_norm(x, bb.final_layer_norm.normalized_shape, bb.final_layer_norm.weight, bb.final_layer_norm.bias, bb.final_layer_norm.eps)
-            return x.permute(0, 2, 1)
-
-        def _patch_convnext(bb, x, cond_embedding_id=None):
-            r = x
-            x = x.permute(0, 2, 1)
-            x = bb.dwconv(x)
-            x = x.permute(0, 2, 1)
-            x = _F.layer_norm(x, bb.norm.normalized_shape, bb.norm.weight, bb.norm.bias, bb.norm.eps)
-            x = bb.pwconv1(x)
-            x = bb.act(x)
-            x = bb.pwconv2(x)
-            if bb.gamma is not None:
-                x = bb.gamma * x
-            return r + x
-
-        def _patch_head(bb, x):
-            x = torch.matmul(bb.out.weight.data, x) + bb.out.bias.data.view(-1, 1)
-            mag, p = x.chunk(2, dim=1)
-            mag = torch.exp(mag).clip(max=1e2)
-            spec = torch.complex(mag * torch.cos(p), mag * torch.sin(p))
-            return bb.istft(spec)
-
-        _vm.VocosBackbone.forward = _patch_backbone
-        _vm.ConvNeXtBlock.forward = _patch_convnext
-        _vh.ISTFTHead.forward = _patch_head
         _report("Vocoder loaded, loading checkpoint...", 30)
         ckpt_path = str(F5_MODEL_DIR / "model_last_repo_compatible_weights.pt")
         vocab_path = str(F5_MODEL_DIR / "vocab.txt")
@@ -399,17 +361,27 @@ class F5Engine:
         cache = self._ensure_audio_cache(voice_id, audio_file, ref_text)
 
         # Split gen_text into batches matching cache max_chars
+        force_single = getattr(self, '_force_single', False)
         from f5_tts.infer.utils_infer import chunk_text as f5_chunk
-        gen_batches = f5_chunk(text, max_chars=cache["max_chars"])
+        if force_single and len(text.encode("utf-8")) <= cache["max_chars"]:
+            gen_batches = [text]
+        else:
+            gen_batches = f5_chunk(text, max_chars=cache["max_chars"])
         if len(gen_batches) == 0:
             gen_batches = [text]
 
+        total_chars = len(text.encode("utf-8"))
+        print(f"[F5] max_chars={cache['max_chars']} text_len={total_chars} batches={len(gen_batches)} force_single={force_single and total_chars <= cache['max_chars']}")
+
         # Process each batch using cached audio + model.sample directly
-        from f5_tts.infer.utils_infer import convert_char_to_pinyin, hop_length, target_sample_rate
+        from f5_tts.infer.utils_infer import convert_char_to_pinyin, hop_length, target_sample_rate, target_rms
         import torch
+        import time as _time
 
         final_wave = None
-        for gen_text in gen_batches:
+        t_start = _time.time()
+        for bi, gen_text in enumerate(gen_batches):
+            tb = _time.time()
             local_speed = speed * (0.3 if len(gen_text.encode("utf-8")) < 10 else 1.0)
 
             text_list = [cache["ref_text"] + gen_text]
@@ -421,12 +393,13 @@ class F5Engine:
             duration = ref_audio_len + int(ref_audio_len / ref_text_len * gen_text_len / local_speed)
 
             with torch.inference_mode():
+                audio_cond = cache["audio"].to(f5_device)
                 generated, _ = self.model.sample(
-                    cond=cache["cond_mel"],
+                    cond=audio_cond,
                     text=final_text_list,
                     duration=duration,
-                    steps=64,
-                    cfg_strength=1.7,
+                    steps=32,
+                    cfg_strength=2.0,
                     sway_sampling_coef=-1.0,
                 )
                 generated = generated.to(torch.float32)
@@ -434,7 +407,14 @@ class F5Engine:
                 generated = generated.permute(0, 2, 1)
                 generated_wave = self.vocoder.decode(generated)
 
+                # Reverse RMS boost applied during caching
+                rms_val = cache["rms"]
+                if rms_val < target_rms:
+                    generated_wave = generated_wave * rms_val / target_rms
+
                 wave_np = generated_wave.squeeze().cpu().numpy().astype(np.float32)
+
+            print(f"[F5]   batch {bi+1}/{len(gen_batches)} chars={gen_text_len} dur={duration} time={_time.time()-tb:.2f}s")
 
             if final_wave is None:
                 final_wave = wave_np
@@ -451,13 +431,12 @@ class F5Engine:
                 else:
                     final_wave = np.concatenate([final_wave, wave_np])
 
-        int16_audio = (final_wave * 32767).astype(np.int16)
+        print(f"[F5] total time={_time.time()-t_start:.2f}s")
+        peak = np.abs(final_wave).max()
+        print(f"[F5] peak={peak:.4f} rms={np.sqrt(np.mean(final_wave**2)):.4f}")
+        import soundfile as sf
         buf = io.BytesIO()
-        with wave.open(buf, "wb") as wf:
-            wf.setnchannels(1)
-            wf.setsampwidth(2)
-            wf.setframerate(target_sample_rate)
-            wf.writeframes(int16_audio.tobytes())
+        sf.write(buf, final_wave, target_sample_rate, format='WAV', subtype='PCM_16')
         buf.seek(0)
         return AudioSegment.from_wav(buf)
 
@@ -501,10 +480,12 @@ class F5Engine:
 
         cache = {
             "cond_mel": cond_mel,
+            "audio": audio.detach().cpu(),
             "ref_text": ref_text,
             "ref_text_len": ref_text_len,
             "ref_audio_len": ref_audio_len,
             "max_chars": max_chars,
+            "rms": rms.item(),
         }
         self._audio_cache[voice_id] = cache
         return cache
@@ -701,7 +682,7 @@ class TaskManager:
         self._tasks: dict[str, dict] = {}
         self._lock = asyncio.Lock()
 
-    async def create(self, text: str, voice_mode: str, voice_id: str, output_format: str = "mp3", normalize: bool = False, clean: bool = False, normalize_audio: bool = True, speed: float = 1.0, pitch: float = 0.0, volume: float = 0.0) -> str:
+    async def create(self, text: str, voice_mode: str, voice_id: str, output_format: str = "mp3", normalize: bool = False, clean: bool = False, normalize_audio: bool = True, speed: float = 1.0, pitch: float = 0.0, volume: float = 0.0, split_segments: bool = False) -> str:
         task_id = uuid.uuid4().hex[:12]
         engine_type = voice_mode if voice_mode in ("preset", "custom") else "preset"
         raw_chunks = chunk_text_sentences(text)
@@ -728,6 +709,7 @@ class TaskManager:
                 "speed": speed,
                 "pitch": pitch,
                 "volume": volume,
+                "split_segments": split_segments,
                 "chunks": chunks,
                 "status": "pending",
                 "progress": 0,

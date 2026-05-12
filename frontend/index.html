@@ -1575,9 +1575,9 @@
   <div class="main-layout">
     <!-- LEFT PANEL -->
     <div class="left-panel">
-      <div class="card">
+      <div class="card" id="inputCard">
         <textarea id="textInput" placeholder="Paste your text here..."></textarea>
-        <div class="char-count"><span id="charCount">0</span> / 10000 characters</div>
+        <div class="char-count"><span id="charCount">0</span> / 5000 characters</div>
         <div class="pause-controls">
           <select id="pauseDurSelect">
             <option value="0.5">0.5s</option>
@@ -1601,6 +1601,12 @@
           <label class="checkbox-label">
             <input type="checkbox" id="normalizeAudioCheckbox" checked>
             <span>Normalize volume</span>
+          </label>
+          <label class="checkbox-label" id="splitSegmentsLabel" style="border-top:1px solid var(--card-border);padding-top:10px;margin-top:4px;">
+            <input type="checkbox" id="splitSegmentsCheckbox">
+            <span>Split segments</span>
+            <span style="font-size:11px;color:var(--error);font-weight:400;margin-left:4px;">(OFF for faster)</span>
+            <span style="font-size:11px;color:var(--text-muted);font-weight:400;margin-left:4px;">— But no per-sentence editing & paragraph pauses</span>
           </label>
         </div>
       </div>
@@ -1870,7 +1876,7 @@
 
     <h3 style="font-family:'Playfair Display',serif;margin:18px 0 6px;font-size:16px;color:var(--accent-primary);">3. Generate Speech</h3>
     <ul style="padding-left:20px;margin:6px 0;">
-      <li>Type or paste your text (max 10000 characters)</li>
+      <li>Type or paste your text (max 5000 characters)</li>
       <li>Select <strong>Low</strong> / <strong>Medium</strong> / <strong>High</strong> quality tier</li>
       <li>Click <strong>Preview</strong> to hear a sample, or <strong>Generate</strong> for full audio</li>
       <li>Long text is split into segments — you can replay or regenerate each one</li>
@@ -2047,6 +2053,7 @@ voiceModeToggle.addEventListener('click', e => {
   btn.classList.add('active');
   CURRENT_VOICE_MODE = btn.dataset.mode;
   document.getElementById('newVoiceBtn').style.display = (CURRENT_VOICE_MODE === 'medium' || CURRENT_VOICE_MODE === 'high') ? 'inline-block' : 'none';
+  updateSplitCheckbox();
   const list = ALL_VOICES[CURRENT_VOICE_MODE] || [];
   if (list.length > 0 && !list.find(v => v.id === CURRENT_VOICE_ID)) {
     selectVoice(list[0].id, list[0].label, list[0].gender || '');
@@ -2108,6 +2115,7 @@ async function loadVoices() {
 function selectVoice(id, label, gender) {
   CURRENT_VOICE_ID = id;
   updateVoiceLabel();
+  updateSplitCheckbox();
 }
 
 function anyVoiceExists() {
@@ -2127,6 +2135,19 @@ function updateVoiceLabel() {
   const engineBadge = `<span class="voice-engine-badge ${badgeClass}">${QUALITY_LABELS[CURRENT_VOICE_MODE]}</span>`;
   const label = v ? `${v.label} <span class="gender-icon">${genderIcon}</span>${engineBadge}` : (CURRENT_VOICE_ID || 'Unknown');
   document.getElementById('currentVoiceLabel').innerHTML = label;
+}
+
+function updateSplitCheckbox() {
+  const label = document.getElementById('splitSegmentsLabel');
+  const cb = document.getElementById('splitSegmentsCheckbox');
+  if (CURRENT_VOICE_MODE === 'high') {
+    label.style.display = '';
+    cb.disabled = false;
+  } else {
+    label.style.display = 'none';
+    cb.checked = true;
+    cb.disabled = false;
+  }
 }
 
 function getCurrentVoiceLabel() {
@@ -2177,6 +2198,7 @@ function selectVoiceFromCard(mode, id) {
     CURRENT_VOICE_MODE = mode;
     CURRENT_VOICE_ID = id;
     updateVoiceLabel();
+    updateSplitCheckbox();
     document.querySelectorAll('#voiceModeToggle .toggle-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
     document.getElementById('newVoiceBtn').style.display = (mode === 'medium' || mode === 'high') ? 'inline-block' : 'none';
     updateCharCount();
@@ -2295,7 +2317,7 @@ async function startGeneration() {
     const res = await fetch(`${API_BASE}/tts/generate`, {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({text, voice_mode: CURRENT_VOICE_MODE, voice_id: CURRENT_VOICE_ID, output_format: 'mp3', normalize, clean: document.getElementById('cleanCheckbox').checked, normalize_audio: document.getElementById('normalizeAudioCheckbox').checked, speed: parseFloat(document.getElementById('speedSlider').value), pitch: parseFloat(document.getElementById('pitchSlider').value), volume: parseFloat(document.getElementById('volumeSlider').value)}),
+      body: JSON.stringify({text, voice_mode: CURRENT_VOICE_MODE, voice_id: CURRENT_VOICE_ID, output_format: 'mp3', normalize, clean: document.getElementById('cleanCheckbox').checked, normalize_audio: document.getElementById('normalizeAudioCheckbox').checked, speed: parseFloat(document.getElementById('speedSlider').value), pitch: parseFloat(document.getElementById('pitchSlider').value), volume: parseFloat(document.getElementById('volumeSlider').value), split_segments: document.getElementById('splitSegmentsCheckbox').checked}),
     });
     if (!res.ok) throw new Error('Generation failed');
     const data = await res.json();
@@ -2339,8 +2361,27 @@ function onChunksDone(data) {
   STATE = 'chunks_done';
   generateBtn.disabled = false;
   progressCard.classList.add('hidden');
-  mergeSection.classList.remove('hidden');
+  const chunks = data.chunks || [];
+  if (chunks.length > 1) {
+    mergeSection.classList.remove('hidden');
+  }
   resetBtn.style.display = 'inline-flex';
+}
+
+async function doMerge() {
+  if (!CURRENT_TASK_ID) return;
+  try {
+    const res = await fetch(`${API_BASE}/tts/merge`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({task_id: CURRENT_TASK_ID, output_format: 'mp3'}),
+    });
+    if (!res.ok) throw new Error('Merge failed');
+    const data = await res.json();
+    outputCard.classList.remove('hidden');
+    CURRENT_AUDIO_URL = `${API_BASE}${data.audio_url}`;
+    audioPlayer.src = CURRENT_AUDIO_URL; audioPlayer.load();
+  } catch (e) { showError('Auto-merge: ' + e.message); }
 }
 
 function setProgress(pct, label) {
@@ -2360,21 +2401,10 @@ mergeBtn.addEventListener('click', async () => {
   mergeBtn.disabled = true; mergeBtn.textContent = 'Merging...';
   progressCard.classList.remove('hidden');
   setProgress(90, 'Merging audio...');
-  try {
-    const res = await fetch(`${API_BASE}/tts/merge`, {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({task_id: CURRENT_TASK_ID, output_format: 'mp3'}),
-    });
-    if (!res.ok) throw new Error('Merge failed');
-    const data = await res.json();
-    mergeBtn.disabled = false; mergeBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;"><path d="M8 6L21 6"/><path d="M8 12L21 12"/><path d="M8 18L21 18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg> Merge &amp; Download All';
-    mergeSection.classList.add('hidden');
-    progressCard.classList.add('hidden');
-    outputCard.classList.remove('hidden');
-    CURRENT_AUDIO_URL = `${API_BASE}${data.audio_url}`;
-    audioPlayer.src = CURRENT_AUDIO_URL; audioPlayer.load();
-  } catch (e) { showError('Merge: ' + e.message); mergeBtn.disabled = false; mergeBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;"><path d="M8 6L21 6"/><path d="M8 12L21 12"/><path d="M8 18L21 18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg> Merge &amp; Download All'; }
+  await doMerge();
+  mergeBtn.disabled = false; mergeBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;"><path d="M8 6L21 6"/><path d="M8 12L21 12"/><path d="M8 18L21 18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg> Merge &amp; Download All';
+  mergeSection.classList.add('hidden');
+  progressCard.classList.add('hidden');
 });
 
 downloadBtn.addEventListener('click', () => {
@@ -2586,11 +2616,60 @@ function renderChunks(chunks) {
     chunkList.innerHTML = '<div class="no-chunks">No segments yet</div>';
     chunkCount.textContent = '';
     chunkPagination.style.display = 'none';
+    mergeSection.classList.add('hidden');
     return;
   }
   CHUNK_DATA = chunks;
   chunkCount.textContent = `(${chunks.length} segments)`;
+  chunkPagination.style.display = 'none';
 
+  // Single chunk (non-split mode)
+  if (chunks.length === 1) {
+    const c = chunks[0];
+    const isDone = c.status === 'done';
+    chunkList.innerHTML = `
+      <div class="card" style="margin:0;padding:16px;background:var(--bg-primary);border-radius:var(--radius-md);min-height:200px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+          <span style="font-size:12px;color:var(--text-muted);font-weight:600;text-transform:uppercase;">Generated Audio</span>
+        </div>
+        <div id="chunkBody_0" class="open">
+          <textarea id="chunkText_0" style="width:100%;min-height:120px;font-size:13px;background:var(--card-bg);border:1px solid var(--card-border);border-radius:var(--radius-sm);padding:10px;resize:vertical;outline:none;color:var(--text-primary);" readonly>${escapeHtml(c.text)}</textarea>
+        </div>
+        ${isDone ? `
+        <div style="display:flex;gap:10px;margin-top:12px;align-items:center;flex-wrap:wrap;">
+          <audio src="${API_BASE}${c.audio_url}" controls style="flex:1;min-width:200px;height:40px;border-radius:var(--radius-sm);"></audio>
+          <select id="singleFormatSelect" style="padding:6px 10px;border:1px solid var(--card-border);border-radius:var(--radius-sm);font-size:12px;background:var(--card-bg);color:var(--text-secondary);">
+            <option value="mp3">MP3</option>
+            <option value="wav">WAV</option>
+          </select>
+          <button class="btn btn-primary btn-sm" onclick="regenChunk(0)" style="white-space:nowrap;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+            Regenerate
+          </button>
+          <button class="btn btn-success btn-sm" onclick="downloadChunk(0)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Download
+          </button>
+        </div>` : `
+        <div style="margin-top:12px;text-align:center;color:var(--text-muted);font-size:13px;padding:20px;">
+          ${c.status === 'processing' ? 'Generating...' : 'Queued...'}
+        </div>`}
+      </div>`;
+    mergeSection.classList.add('hidden');
+    return;
+  }
+
+  function downloadChunk(index) {
+    const d = CHUNK_DATA.find(x => x.index === index);
+    if (!d || !d.audio_url) return;
+    const fmt = document.getElementById('singleFormatSelect')?.value || 'mp3';
+    const a = document.createElement('a');
+    a.href = `${API_BASE}${d.audio_url}&format=${fmt}`;
+    a.download = `tts_output.${fmt}`;
+    a.click();
+  }
+
+  // Multiple chunks (split mode) — show compact list with pagination
   const totalPages = Math.ceil(chunks.length / CHUNK_PER_PAGE);
   if (CHUNK_PAGE >= totalPages) CHUNK_PAGE = totalPages - 1;
   if (CHUNK_PAGE < 0) CHUNK_PAGE = 0;
@@ -3100,7 +3179,7 @@ document.getElementById('helpModal').addEventListener('click', e => {
   if (e.target === e.currentTarget) document.getElementById('helpModal').classList.add('hidden');
 });
 
-updateCharCount(); loadVoices();
+updateCharCount(); updateSplitCheckbox(); loadVoices();
 fetch(`${API_BASE}/tts/pause_config`).then(r => r.json()).then(c => { PAUSE_CFG = c; updateCharCount(); }).catch(() => {});
 </script>
 </body>

@@ -6,7 +6,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 def _env_path(key: str, default: str) -> Path:
     return Path(os.environ.get(key, default))
 
-_DEFAULT_RESOURCE = PROJECT_ROOT / "models"
+_DEFAULT_RESOURCE = PROJECT_ROOT.parent / "TTS_Resource"
 
 PIPER_DIR = _env_path("PIPER_DIR", str(_DEFAULT_RESOURCE / "piper"))
 
@@ -20,6 +20,6 @@ FFMPEG_DIR = _env_path("FFMPEG_DIR", str(_DEFAULT_RESOURCE.parent / "ffmpeg" / "
 OUTPUT_DIR = PROJECT_ROOT / "backend_cpu" / "outputs"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
-MAX_TEXT_LENGTH = 10000
+MAX_TEXT_LENGTH = 5000
 PIPER_SAMPLE_RATE = 22050
 CROSS_FADE_MS = 50

@@ -21,7 +21,7 @@ import aiohttp
 import aiofiles
 from huggingface_hub import HfApi
 
-from config import OUTPUT_DIR, PIPER_DIR
+from config import OUTPUT_DIR, PIPER_DIR, MAX_TEXT_LENGTH
 from tts_engine import (
     PiperEngine, TaskManager,
     chunk_text_sentences, merge_audio_segments,
@@ -247,8 +247,8 @@ async def generate_tts(req: TTSRequest):
     text = req.text.strip()
     if not text:
         raise HTTPException(400, "Text is empty")
-    if len(text) > 10000:
-        raise HTTPException(400, "Text exceeds 10000 characters")
+    if len(text) > MAX_TEXT_LENGTH:
+        raise HTTPException(400, f"Text exceeds {MAX_TEXT_LENGTH} characters")
 
     task_id = await task_manager.create(
         text=text, voice_mode=req.voice_mode, voice_id=req.voice_id,
