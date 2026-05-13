@@ -20,7 +20,7 @@ OMNIVOICE_MODEL_DIR = F5_RESOURCE_DIR / "omnivoice"
 
 PIPER_DIR = _env_path("PIPER_DIR", str(_DEFAULT_RESOURCE / "piper"))
 
-FFMPEG_DIR = _env_path("FFMPEG_DIR", str(_DEFAULT_RESOURCE.parent / "ffmpeg" / "bin"))
+FFMPEG_DIR = _env_path("FFMPEG_DIR", str(PROJECT_ROOT.parent / "ffmpeg-8.0.1-essentials_build" / "bin"))
 
 OUTPUT_DIR = PROJECT_ROOT / "backend" / "outputs"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)

@@ -937,7 +937,10 @@ async def download_file(path: str = Query(...), format: str = Query("mp3")):
     loop = asyncio.get_running_loop()
     audio = await loop.run_in_executor(None, AudioSegment.from_file, str(file_path))
     buf = io.BytesIO()
-    await loop.run_in_executor(None, lambda: audio.export(buf, format=target_fmt, bitrate="320k"))
+    export_kwargs = {"format": target_fmt}
+    if target_fmt == "mp3":
+        export_kwargs["bitrate"] = "320k"
+    await loop.run_in_executor(None, lambda: audio.export(buf, **export_kwargs))
     buf.seek(0)
     media_type = "audio/mpeg" if target_fmt == "mp3" else "audio/wav"
     return Response(content=buf.read(), media_type=media_type, headers={"Content-Disposition": f'attachment; filename="tts_output.{target_fmt}"'})
@@ -1183,6 +1186,12 @@ async def delete_history(history_id: str):
 
 @app.delete("/tts/history")
 async def clear_history():
+    import shutil
+    # Delete all output directories
+    for d in OUTPUT_DIR.iterdir():
+        if d.is_dir():
+            shutil.rmtree(d, ignore_errors=True)
+    # Clear history file
     HISTORY_FILE.write_text("[]", encoding="utf-8")
     return {"status": "cleared"}
 
