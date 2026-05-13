@@ -804,8 +804,14 @@ async def regenerate_chunk(req: ChunkRegenRequest):
     if req.chunk_index < 0 or req.chunk_index >= len(task["chunks"]):
         raise HTTPException(400, "Invalid chunk index")
 
+    chunk = task["chunks"][req.chunk_index]
     engine_type = _validate_voice_mode(task["voice_mode"])
-    chunk_text = req.text if req.text else task["chunks"][req.chunk_index]["text"]
+    chunk_text = req.text if req.text else chunk["text"]
+
+    # Skip if text unchanged and audio already generated
+    if not req.text and chunk["status"] == "done" and chunk["audio_path"]:
+        return {"chunk_index": req.chunk_index, "status": "cached", "audio_url": chunk["audio_path"]}
+
     chunk_gen_text = chunk_text
     if task.get("normalize"):
         chunk_gen_text = normalize_with_pause_protection(chunk_text)
@@ -869,6 +875,12 @@ async def merge_chunks(req: MergeRequest):
         chunk_rel = path.split("/", 1)[-1] if "/" in path else path
         full_path = td / chunk_rel
         seg = await loop.run_in_executor(None, AudioSegment.from_file, str(full_path))
+
+        # Quick wins: trim silence, fade edges
+        def _post(segment):
+            s = segment.strip_silence(silence_len=100, silence_thresh=-50)
+            return s.fade_in(8).fade_out(12)
+        seg = await loop.run_in_executor(None, _post, seg)
         segments.append(seg)
         chunk_dur = c.get("duration", round(len(seg) / 1000, 3))
 
@@ -886,7 +898,18 @@ async def merge_chunks(req: MergeRequest):
         srt_lines.append("")
         total_dur += chunk_dur
 
+    # Volume match: normalize each segment to average RMS
+    if len(segments) > 1:
+        avg_db = sum(s.dBFS for s in segments) / len(segments)
+        segments = [s.apply_gain(avg_db - s.dBFS) for s in segments]
+
     merged = await loop.run_in_executor(None, merge_audio_segments, segments)
+
+    # Light compressor: threshold=-20dB, ratio=2:1
+    def _compress(m):
+        return m.compress_dynamic_range(threshold=-20, ratio=2.0, attack=5, release=50)
+    merged = await loop.run_in_executor(None, _compress, merged)
+
     output_filename = f"final.{output_format}"
     output_path = td / output_filename
     merged.export(str(output_path), format=output_format, bitrate="320k")
