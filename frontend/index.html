@@ -20,8 +20,13 @@
     --accent-secondary: #8b6f47;
     --accent-gold: #b8943e;
     --success: #6b8e6b;
+    --success-light: rgba(107,142,107,0.1);
     --error: #b85c5c;
+    --error-light: rgba(184,92,92,0.1);
     --warning: #c4a35a;
+    --warning-light: rgba(196,163,90,0.1);
+    --processing: #5b7a6a;
+    --processing-light: rgba(91,122,106,0.1);
     --shadow-sm: 0 1px 3px rgba(61,53,41,0.08);
     --shadow-md: 0 4px 12px rgba(61,53,41,0.12);
     --shadow-lg: 0 8px 24px rgba(61,53,41,0.16);
@@ -424,17 +429,41 @@
     background: var(--accent-primary);
     color: #fff;
     flex: 1;
+    padding: 12px 24px;
+    font-size: 15px;
+    letter-spacing: 0.3px;
+    box-shadow: 0 2px 8px rgba(91,122,106,0.25);
+    transition: all 0.25s ease;
   }
 
   .btn-primary:hover {
-    background: var(--accent-primary-hover);
-    box-shadow: var(--shadow-sm);
+    background: #4e7060;
+    box-shadow: 0 4px 16px rgba(91,122,106,0.35);
+    transform: translateY(-1px);
+  }
+
+  .btn-primary:active {
+    transform: translateY(0);
+    box-shadow: 0 1px 4px rgba(91,122,106,0.2);
   }
 
   .btn-primary:disabled {
     background: var(--text-muted);
     cursor: not-allowed;
     opacity: 0.6;
+    box-shadow: none;
+    transform: none;
+  }
+
+  #generateBtn {
+    background: linear-gradient(135deg, #5b7a6a 0%, #4a6658 100%);
+    font-weight: 700;
+    letter-spacing: 0.5px;
+  }
+
+  #generateBtn:hover:not(:disabled) {
+    background: linear-gradient(135deg, #4e7060 0%, #3d5848 100%);
+    box-shadow: 0 0 20px rgba(91,122,106,0.4), 0 4px 16px rgba(91,122,106,0.3);
   }
 
   .btn-secondary {
@@ -455,6 +484,26 @@
 
   .btn-success:hover {
     background: #5a7a5a;
+  }
+
+  .btn-export {
+    background: linear-gradient(135deg, #4a6658 0%, #3d5848 100%);
+    color: #fff;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    box-shadow: 0 2px 8px rgba(74,102,88,0.3);
+    transition: all 0.25s ease;
+  }
+
+  .btn-export:hover {
+    background: linear-gradient(135deg, #3d5848 0%, #2e4438 100%);
+    box-shadow: 0 0 16px rgba(74,102,88,0.4), 0 4px 12px rgba(74,102,88,0.3);
+    transform: translateY(-1px);
+  }
+
+  .btn-export:active {
+    transform: translateY(0);
+    box-shadow: 0 1px 4px rgba(74,102,88,0.2);
   }
 
   .btn-warning {
@@ -503,6 +552,96 @@
     margin-top: 8px;
     text-align: center;
     font-family: 'JetBrains Mono', monospace;
+  }
+
+  /* Floating progress bar */
+  .progress-float {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(120%);
+    width: 90%;
+    max-width: 700px;
+    z-index: 60;
+    background: linear-gradient(135deg, rgba(250,248,243,0.97) 0%, rgba(237,231,217,0.97) 100%);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--accent-primary);
+    border-radius: var(--radius-lg);
+    padding: 16px 24px;
+    box-shadow: 0 8px 32px rgba(61,53,41,0.15), 0 0 0 1px rgba(91,122,106,0.1);
+    transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .progress-float.visible {
+    transform: translateX(-50%) translateY(0);
+  }
+
+  .progress-float .progress-status-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+
+  .progress-float .progress-status-text {
+    font-size: 14px;
+    color: var(--text-secondary);
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .progress-float .progress-status-text .spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--card-border);
+    border-top-color: var(--accent-primary);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  .progress-float .progress-count {
+    font-size: 13px;
+    color: var(--text-muted);
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .progress-float .progress-bar-bg {
+    height: 6px;
+    margin-bottom: 6px;
+  }
+
+  .progress-float .progress-eta {
+    text-align: center;
+    font-size: 11px;
+    color: var(--text-muted);
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .progress-float .cancel-btn {
+    padding: 4px 12px;
+    border: 1px solid var(--error);
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--error);
+    cursor: pointer;
+    font-size: 12px;
+    font-family: inherit;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .progress-float .cancel-btn:hover {
+    background: rgba(184,92,92,0.08);
+  }
+
+  .progress-float .cancel-btn svg {
+    width: 12px;
+    height: 12px;
   }
 
   .output-section audio {
@@ -574,27 +713,67 @@
   .chunk-item {
     border: 1px solid var(--card-border);
     border-radius: var(--radius-md);
-    margin-bottom: 8px;
-    transition: all 0.2s ease;
+    margin-bottom: 10px;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
     background: var(--card-bg);
+    box-shadow: 0 1px 2px rgba(61,53,41,0.04);
   }
 
   .chunk-item:hover {
     border-color: var(--accent-primary);
-    box-shadow: var(--shadow-sm);
+    box-shadow: 0 4px 12px rgba(61,53,41,0.1), 0 1px 3px rgba(91,122,106,0.08);
+    transform: translateY(-1px);
   }
 
   .chunk-item.processing {
-    border-color: var(--accent-primary);
-    background: rgba(91,122,106,0.04);
+    border-color: #4a9e7a;
+    border-width: 2px;
+    background: linear-gradient(90deg, var(--card-bg) 0%, rgba(91,122,106,0.08) 50%, var(--card-bg) 100%);
+    background-size: 200% 100%;
+    animation: shimmer 2s infinite linear;
+    box-shadow: 0 0 0 1px rgba(74,158,122,0.2), 0 4px 16px rgba(91,122,106,0.15);
+  }
+
+  .chunk-item.processing .chunk-index {
+    background: linear-gradient(135deg, #4a9e7a, #5b7a6a);
+    color: #fff;
+    animation: pulse 1.5s infinite;
   }
 
   .chunk-item.done {
-    border-color: var(--success);
+    border-color: rgba(107,142,107,0.4);
+    background: linear-gradient(135deg, var(--card-bg) 0%, var(--success-light) 100%);
+  }
+
+  .chunk-item.done .chunk-index {
+    background: var(--success);
+    color: #fff;
+  }
+
+  .chunk-item.warning {
+    border-color: #d4a832;
+    border-width: 2px;
+    background: linear-gradient(135deg, var(--card-bg) 0%, rgba(196,163,90,0.12) 100%);
+    box-shadow: 0 0 0 1px rgba(212,168,50,0.2), 0 2px 12px rgba(196,163,90,0.12);
+    animation: warning-pulse 2s infinite;
+  }
+
+  .chunk-item.warning .chunk-index {
+    background: linear-gradient(135deg, #d4a832, #c4a35a);
+    color: #fff;
   }
 
   .chunk-item.error {
-    border-color: var(--error);
+    border-color: #c44;
+    border-width: 2px;
+    background: linear-gradient(135deg, var(--card-bg) 0%, rgba(184,92,92,0.12) 100%);
+    box-shadow: 0 0 0 1px rgba(204,68,68,0.25), 0 2px 12px rgba(184,92,92,0.15);
+    animation: error-pulse 2s infinite;
+  }
+
+  .chunk-item.error .chunk-index {
+    background: linear-gradient(135deg, #c44, #b85c5c);
+    color: #fff;
   }
 
   .chunk-header {
@@ -621,32 +800,49 @@
     font-family: 'JetBrains Mono', monospace;
   }
 
-  .chunk-item.done .chunk-index {
-    background: var(--success);
-    color: #fff;
-  }
-
-  .chunk-item.error .chunk-index {
-    background: var(--error);
-    color: #fff;
-  }
-
   .chunk-item.processing .chunk-index {
-    background: var(--accent-primary);
-    color: #fff;
     animation: pulse 1.5s infinite;
   }
 
   @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.5; }
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.6; transform: scale(1.1); }
+  }
+
+  @keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+
+  @keyframes error-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(184,92,92,0.4); }
+    50% { box-shadow: 0 0 0 4px rgba(184,92,92,0.15); }
+  }
+
+  @keyframes warning-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(196,163,90,0.4); }
+    50% { box-shadow: 0 0 0 4px rgba(196,163,90,0.15); }
+  }
+
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
   }
 
   .chunk-status-icon {
     font-size: 14px;
     flex-shrink: 0;
-    width: 18px;
+    width: 20px;
+    height: 20px;
     text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .chunk-status-icon svg {
+    width: 16px;
+    height: 16px;
   }
 
   .chunk-text-preview {
@@ -736,6 +932,505 @@
     font-size: 13px;
     padding: 40px 0;
     font-style: italic;
+  }
+
+  .drop-zone {
+    position: relative;
+    border: 2px dashed var(--card-border);
+    border-radius: var(--radius-md);
+    transition: all 0.25s ease;
+    cursor: pointer;
+    margin-bottom: 12px;
+    background: var(--bg-primary);
+    overflow: hidden;
+  }
+
+  .drop-zone.dragover {
+    border-color: var(--accent-primary);
+    background: rgba(91,122,106,0.04);
+  }
+
+  .drop-zone.dragover textarea {
+    opacity: 0.3;
+  }
+
+  .drop-zone-hint {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 13px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.25s ease;
+    z-index: 1;
+  }
+
+  .drop-zone.empty .drop-zone-hint {
+    opacity: 1;
+  }
+
+  .drop-zone-hint svg {
+    width: 28px;
+    height: 28px;
+    margin-bottom: 6px;
+    opacity: 0.4;
+  }
+
+  .drop-zone-hint span {
+    display: inline-block;
+    background: var(--bg-secondary);
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    margin: 0 2px;
+  }
+
+  .drop-zone textarea {
+    position: relative;
+    z-index: 2;
+    border: none;
+    background: transparent;
+    min-height: 160px;
+  }
+
+  .drop-zone textarea:focus {
+    box-shadow: none;
+  }
+
+  .input-metadata {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    padding: 10px 14px;
+    background: var(--bg-secondary);
+    border-radius: var(--radius-sm);
+    margin-top: 10px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .input-metadata span {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .input-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+    flex-wrap: wrap;
+  }
+
+  .segment-filters {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+  }
+
+  .segment-filter-btn {
+    padding: 4px 12px;
+    border: 1px solid var(--card-border);
+    border-radius: 16px;
+    background: var(--card-bg);
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 12px;
+    font-family: inherit;
+    transition: all 0.2s ease;
+  }
+
+  .segment-filter-btn.active {
+    background: var(--accent-primary);
+    color: #fff;
+    border-color: var(--accent-primary);
+  }
+
+  .segment-filter-btn:hover:not(.active) {
+    background: var(--bg-secondary);
+    border-color: var(--accent-primary);
+  }
+
+  .batch-actions {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+  }
+
+  .final-audio-section {
+    background: linear-gradient(135deg, rgba(250,248,243,0.97) 0%, rgba(237,231,217,0.97) 100%);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-top: 1px solid rgba(91,122,106,0.3);
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    padding: 16px 24px;
+    box-shadow: 0 -8px 32px rgba(61,53,41,0.12), 0 -2px 8px rgba(61,53,41,0.06);
+  }
+
+  .final-audio-bar {
+    position: fixed;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%) translateY(100%);
+    width: 90%;
+    max-width: 1000px;
+    z-index: 50;
+    background: transparent;
+    padding-bottom: 0;
+    transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .final-audio-bar.visible {
+    transform: translateX(-50%) translateY(0);
+  }
+
+  .final-audio-bar::before {
+    content: '';
+    position: absolute;
+    top: -60px;
+    left: -20%;
+    right: -20%;
+    height: 60px;
+    pointer-events: none;
+  }
+
+  .final-audio-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(61,53,41,0.15);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    z-index: 49;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.35s ease;
+  }
+
+  .final-audio-overlay.visible {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .final-audio-bar .final-audio-section {
+    max-width: 1000px;
+    margin: 0 auto;
+    position: relative;
+  }
+
+  .reopen-final-btn {
+    position: fixed;
+    bottom: 16px;
+    right: 24px;
+    z-index: 48;
+    display: none;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 18px;
+    border: none;
+    border-radius: 24px;
+    background: var(--accent-primary);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    box-shadow: 0 4px 16px rgba(91,122,106,0.3);
+    transition: all 0.25s ease;
+  }
+
+  .reopen-final-btn.visible {
+    display: flex;
+  }
+
+  .reopen-final-btn:hover {
+    background: var(--accent-primary-hover);
+    box-shadow: 0 4px 20px rgba(91,122,106,0.4);
+    transform: translateY(-2px);
+  }
+
+  .reopen-final-btn svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .final-audio-header {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--accent-primary);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(91,122,106,0.3);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .final-audio-header .close-final {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 18px;
+    padding: 0 4px;
+    line-height: 1;
+    transition: color 0.2s;
+  }
+
+  .final-audio-header .close-final:hover {
+    color: var(--text-primary);
+  }
+
+  .final-audio-metadata {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px solid var(--card-border);
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+
+  .final-audio-metadata span {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .waveform-wrap {
+    position: relative;
+    margin-top: 12px;
+    cursor: pointer;
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+  }
+
+  .waveform-wrap canvas {
+    display: block;
+    width: 100%;
+    height: 80px;
+    background: var(--bg-secondary);
+    transition: filter 0.2s ease;
+  }
+
+  .waveform-wrap:hover canvas {
+    filter: brightness(1.05);
+  }
+
+  .waveform-wrap .waveform-seek {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 0;
+    background: rgba(91,122,106,0.15);
+    pointer-events: none;
+    transition: width 0.1s linear;
+  }
+
+  .waveform-wrap .waveform-time {
+    position: absolute;
+    top: 8px;
+    right: 12px;
+    font-size: 11px;
+    font-family: 'JetBrains Mono', monospace;
+    color: rgba(255,255,255,0.8);
+    background: rgba(61,53,41,0.6);
+    padding: 2px 8px;
+    border-radius: 4px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  .waveform-wrap:hover .waveform-time {
+    opacity: 1;
+  }
+
+  .export-options {
+    display: flex;
+    gap: 8px;
+    margin-top: 16px;
+    flex-wrap: wrap;
+  }
+
+  .autosave-indicator {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-family: 'JetBrains Mono', monospace;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .autosave-indicator svg {
+    width: 12px;
+    height: 12px;
+  }
+
+  /* Custom audio player */
+  .custom-player {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 0;
+  }
+
+  .cp-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border: none;
+    border-radius: 50%;
+    background: var(--accent-primary);
+    color: #fff;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+  }
+
+  .cp-btn:hover {
+    background: var(--accent-primary-hover);
+    box-shadow: 0 2px 8px rgba(91,122,106,0.3);
+  }
+
+  .cp-btn svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .cp-btn.cp-vol {
+    width: 32px;
+    height: 32px;
+    background: transparent;
+    color: var(--text-secondary);
+  }
+
+  .cp-btn.cp-vol:hover {
+    background: var(--bg-secondary);
+    color: var(--accent-primary);
+    box-shadow: none;
+  }
+
+  .cp-btn#cpSpeedBtn {
+    width: auto;
+    border-radius: var(--radius-sm);
+    padding: 0 10px;
+    font-size: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+  }
+
+  .cp-btn#cpSpeedBtn:hover {
+    background: var(--accent-primary);
+    color: #fff;
+  }
+
+  .cp-time {
+    font-size: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--text-secondary);
+    min-width: 90px;
+    flex-shrink: 0;
+  }
+
+  .cp-progress-bg {
+    flex: 1;
+    height: 6px;
+    background: var(--card-border);
+    border-radius: 3px;
+    cursor: pointer;
+    position: relative;
+    transition: height 0.15s ease;
+  }
+
+  .cp-progress-bg:hover {
+    height: 8px;
+  }
+
+  .cp-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent-primary), var(--accent-gold));
+    border-radius: 3px;
+    width: 0;
+    transition: width 0.1s linear;
+    position: relative;
+  }
+
+  .cp-progress-fill::after {
+    content: '';
+    position: absolute;
+    right: -5px;
+    top: 50%;
+    transform: translateY(-50%) scale(0);
+    width: 12px;
+    height: 12px;
+    background: #fff;
+    border-radius: 50%;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+    transition: transform 0.15s ease;
+  }
+
+  .cp-progress-bg:hover .cp-progress-fill::after {
+    transform: translateY(-50%) scale(1);
+  }
+
+  .cp-vol-slider {
+    width: 70px;
+    height: 4px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: var(--card-border);
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  .cp-vol-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--accent-primary);
+    cursor: pointer;
+    border: 2px solid #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  }
+
+  .skeleton {
+    background: linear-gradient(90deg, var(--bg-secondary) 25%, var(--card-bg) 50%, var(--bg-secondary) 75%);
+    background-size: 200% 100%;
+    animation: skeleton-loading 1.5s infinite;
+    border-radius: var(--radius-sm);
+  }
+
+  @keyframes skeleton-loading {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+
+  .segment-glow {
+    animation: segment-glow 2s infinite;
+  }
+
+  @keyframes segment-glow {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(91,122,106,0.4); }
+    50% { box-shadow: 0 0 12px 4px rgba(91,122,106,0.2); }
   }
 
   .hidden { display: none !important; }
@@ -1587,8 +2282,30 @@
     <!-- LEFT PANEL -->
     <div class="left-panel">
       <div class="card" id="inputCard">
-        <textarea id="textInput" placeholder="Paste your text here..."></textarea>
-        <div class="char-count"><span id="charCount">0</span> / 5000 characters</div>
+        <div class="drop-zone empty" id="dropZone">
+          <textarea id="textInput" placeholder="Paste your text here, or drop a .txt / .md file..."></textarea>
+          <div class="drop-zone-hint">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            <div>Drop <span>.txt</span> <span>.md</span> or paste text</div>
+          </div>
+          <input type="file" id="fileInput" accept=".txt,.md" style="display:none;">
+        </div>
+        <div class="input-metadata" id="inputMetadata">
+          <span id="charCount">0 chars</span>
+          <span id="wordCount">0 words</span>
+          <span id="estDuration">~0s audio</span>
+          <span id="estSegments">0 segments</span>
+        </div>
+        <div class="input-actions">
+          <button class="btn-icon" id="clearTextBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            Clear
+          </button>
+          <button class="btn-icon" id="saveDraftBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+            Save Draft
+          </button>
+        </div>
         <div class="pause-controls">
           <select id="pauseDurSelect">
             <option value="0.5">0.5s</option>
@@ -1689,32 +2406,10 @@
         </div>
       </div>
 
-      <div class="card hidden" id="progressCard">
+      <div class="card hidden" id="progressCard" style="display:none;">
         <div class="progress-section">
           <div class="progress-bar-bg"><div class="progress-bar-fill" id="progressFill"></div></div>
           <div class="progress-label" id="progressLabel">...</div>
-        </div>
-      </div>
-
-      <div class="card hidden" id="outputCard">
-        <div class="output-section">
-          <audio id="audioPlayer" controls></audio>
-          <canvas id="waveformCanvas" style="width:100%;height:80px;border-radius:var(--radius-sm);background:var(--bg-secondary);margin-top:8px;display:none;"></canvas>
-          <div class="output-actions">
-            <select id="formatSelect">
-              <option value="mp3">MP3</option>
-              <option value="wav">WAV</option>
-              <option value="srt">SRT</option>
-            </select>
-            <button class="btn btn-success btn-sm" id="downloadBtn">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-              Download
-            </button>
-            <button class="btn btn-ghost btn-sm" id="regenAllBtn">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
-              Regenerate
-            </button>
-          </div>
         </div>
       </div>
 
@@ -1729,12 +2424,48 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
             Text Segments <span id="chunkCount" style="font-weight:400;color:var(--text-muted);font-size:12px;"></span>
           </span>
-          <div class="pagination" id="chunkPagination" style="display:none;">
-            <button id="pagePrev">&#9664;</button>
-            <span id="pageInfo"></span>
-            <button id="pageNext">&#9654;</button>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <div class="pagination" id="chunkPagination" style="display:none;">
+              <button id="pagePrev">&#9664;</button>
+              <span id="pageInfo"></span>
+              <button id="pageNext">&#9654;</button>
+            </div>
+            <div class="autosave-indicator" id="autosaveIndicator" style="display:none;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+              <span id="autosaveText">Saved</span>
+            </div>
           </div>
         </div>
+        
+        <div class="segment-filters" id="segmentFilters" style="display:none;">
+          <button class="segment-filter-btn active" data-filter="all">All</button>
+          <button class="segment-filter-btn" data-filter="done">
+            <span style="color:var(--success);">&#10003;</span> Done
+          </button>
+          <button class="segment-filter-btn" data-filter="warning">
+            <span style="color:var(--warning);">&#9888;</span> Warning
+          </button>
+          <button class="segment-filter-btn" data-filter="failed">
+            <span style="color:var(--error);">&#10007;</span> Failed
+          </button>
+          <button class="segment-filter-btn" data-filter="processing">
+            <span style="color:var(--processing);">&#9696;</span> Processing
+          </button>
+        </div>
+
+        <div class="batch-actions" id="batchActions" style="display:none;">
+          <button class="btn-sm" id="retryFailedBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+            Retry Failed
+          </button>
+          <button class="btn-sm" id="retryWarningBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+            Retry Warning
+          </button>
+          <button class="btn-sm" id="collapseAllBtn">Collapse All</button>
+          <button class="btn-sm" id="expandFailedBtn">Expand Failed</button>
+        </div>
+
         <div id="chunkList" style="flex:1;">
           <div class="no-chunks">Enter text and click Generate to see segments</div>
         </div>
@@ -1746,6 +2477,92 @@
         </div>
       </div>
     </div>
+  </div>
+
+  <!-- STICKY FINAL AUDIO BAR -->
+  <div class="final-audio-overlay" id="finalAudioOverlay"></div>
+  <div class="final-audio-bar" id="finalAudioBar">
+    <div class="final-audio-section">
+      <div class="final-audio-header">
+        <span>Final Audio</span>
+        <button class="close-final" id="closeFinalAudio" title="Hide">&times;</button>
+      </div>
+      <div class="custom-player" id="customPlayer">
+        <button class="cp-btn" id="cpPlayBtn" title="Play">
+          <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        </button>
+        <span class="cp-time" id="cpTime">0:00 / 0:00</span>
+        <div class="cp-progress-bg" id="cpProgressBg">
+          <div class="cp-progress-fill" id="cpProgressFill"></div>
+        </div>
+        <button class="cp-btn cp-vol" id="cpVolBtn" title="Volume">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+        </button>
+        <input type="range" class="cp-vol-slider" id="cpVolSlider" min="0" max="1" step="0.05" value="1" title="Volume">
+        <button class="cp-btn" id="cpSpeedBtn" title="Speed">1×</button>
+      </div>
+
+      <audio id="audioPlayer" style="display:none;"></audio>
+      <div class="waveform-wrap" id="waveformWrap">
+        <canvas id="waveformCanvas" style="display:none;"></canvas>
+        <div class="waveform-seek" id="waveformSeek"></div>
+        <div class="waveform-time" id="waveformTime">0:00</div>
+      </div>
+      <div class="final-audio-metadata" id="finalAudioMetadata">
+        <span id="finalDuration">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          Duration: --
+        </span>
+        <span id="finalSegments">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+          Segments: --
+        </span>
+        <span id="finalVoice">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/></svg>
+          Voice: --
+        </span>
+      </div>
+      <div class="export-options">
+        <select id="formatSelect" style="padding:8px 12px;border:1px solid var(--card-border);border-radius:var(--radius-sm);font-size:13px;background:var(--card-bg);color:var(--text-secondary);">
+          <option value="mp3">MP3 128k</option>
+          <option value="mp3_320">MP3 320k</option>
+          <option value="wav">WAV</option>
+          <option value="srt">SRT</option>
+        </select>
+        <button class="btn btn-export" id="downloadBtn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Export
+        </button>
+        <button class="btn btn-ghost" id="remergeBtn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+          Re-merge
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <button class="reopen-final-btn" id="reopenFinalBtn">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+    Final Audio
+  </button>
+
+  <!-- Floating Progress Bar -->
+  <div class="progress-float" id="progressFloat">
+    <div class="progress-status-row">
+      <span class="progress-status-text">
+        <span class="spinner"></span>
+        <span id="floatStatus">Generating audio...</span>
+      </span>
+      <div style="display:flex;align-items:center;gap:12px;">
+        <span class="progress-count" id="floatCount">0 / 0</span>
+        <button class="cancel-btn" id="floatCancelBtn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          Cancel
+        </button>
+      </div>
+    </div>
+    <div class="progress-bar-bg"><div class="progress-bar-fill" id="floatFill"></div></div>
+    <div class="progress-eta" id="floatEta">0:00</div>
   </div>
 
   <!-- Dictionary Modal -->
@@ -1941,6 +2758,15 @@
       Switch to Medium or High for better voice quality if you have a GPU.
     </p>
 
+    <h3 style="font-family:'Playfair Display',serif;margin:18px 0 6px;font-size:16px;color:var(--accent-primary);">6. Keyboard Shortcuts</h3>
+    <table style="width:100%;border-collapse:collapse;font-size:13px;margin:8px 0;">
+      <tr><th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--card-border);color:var(--text-muted);">Shortcut</th><th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--card-border);color:var(--text-muted);">Action</th></tr>
+      <tr><td style="padding:6px 8px;border-bottom:1px solid rgba(212,201,184,0.3);"><kbd style="background:var(--bg-secondary);padding:2px 8px;border-radius:4px;font-family:'JetBrains Mono',monospace;font-size:12px;border:1px solid var(--card-border);">Space</kbd></td><td style="padding:6px 8px;border-bottom:1px solid rgba(212,201,184,0.3);">Play / Pause audio</td></tr>
+      <tr><td style="padding:6px 8px;border-bottom:1px solid rgba(212,201,184,0.3);"><kbd style="background:var(--bg-secondary);padding:2px 8px;border-radius:4px;font-family:'JetBrains Mono',monospace;font-size:12px;border:1px solid var(--card-border);">R</kbd></td><td style="padding:6px 8px;border-bottom:1px solid rgba(212,201,184,0.3);">Retry first failed segment</td></tr>
+      <tr><td style="padding:6px 8px;"><kbd style="background:var(--bg-secondary);padding:2px 8px;border-radius:4px;font-family:'JetBrains Mono',monospace;font-size:12px;border:1px solid var(--card-border);">Ctrl</kbd> + <kbd style="background:var(--bg-secondary);padding:2px 8px;border-radius:4px;font-family:'JetBrains Mono',monospace;font-size:12px;border:1px solid var(--card-border);">Enter</kbd></td><td style="padding:6px 8px;">Start generation</td></tr>
+    </table>
+    <p style="font-size:12px;color:var(--text-muted);">Shortcuts work when not typing in text fields.</p>
+
     </div>
   </div>
 </div>
@@ -1971,29 +2797,45 @@ let POLL_INTERVAL = null;
 let CURRENT_TASK_ID = null;
 let CURRENT_AUDIO_URL = null;
 let CHUNK_DATA = [];
+let GENERATION_PAUSED = false;
+let GENERATION_START_TIME = null;
+let CURRENT_FILTER = 'all';
+let AUTOSAVE_TIMER = null;
+let CHUNK_PAGE = 0;
+const CHUNK_PER_PAGE = 10;
+let CURRENT_VOICE_MODE = 'low';
+let CURRENT_VOICE_ID = 'banmai';
+let ALL_VOICES = {low: [], medium: [], high: []};
+let VOICE_RATES = {preset: 18, custom: {}};
+let PAUSE_CFG = {enabled: true, pauses: {'.': 0.4, ',': 0.2, ';': 0.3, ':': 0.3, '?': 0.4, '!': 0.4, linebreak: 0.6}};
+
+const QUALITY_LABELS = {low: 'Piper', medium: 'F5', high: 'OmniVoice'};
+const QUALITY_BADGE_CLASS = {low: 'piper', medium: 'f5', high: 'omnivoice'};
 
 const textInput = document.getElementById('textInput');
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
 const charCount = document.getElementById('charCount');
+const wordCount = document.getElementById('wordCount');
+const estDuration = document.getElementById('estDuration');
+const estSegments = document.getElementById('estSegments');
 const voiceModeToggle = document.getElementById('voiceModeToggle');
 const previewBtn = document.getElementById('previewBtn');
 const newVoiceBtn = document.getElementById('newVoiceBtn');
 const generateBtn = document.getElementById('generateBtn');
-const progressCard = document.getElementById('progressCard');
-const progressFill = document.getElementById('progressFill');
-const progressLabel = document.getElementById('progressLabel');
-const outputCard = document.getElementById('outputCard');
+const progressFloat = document.getElementById('progressFloat');
+const floatFill = document.getElementById('floatFill');
+const floatStatus = document.getElementById('floatStatus');
+const floatCount = document.getElementById('floatCount');
+const floatEta = document.getElementById('floatEta');
+const floatCancelBtn = document.getElementById('floatCancelBtn');
+const finalAudioBar = document.getElementById('finalAudioBar');
+const finalAudioOverlay = document.getElementById('finalAudioOverlay');
+const reopenFinalBtn = document.getElementById('reopenFinalBtn');
 const audioPlayer = document.getElementById('audioPlayer');
 const formatSelect = document.getElementById('formatSelect');
 const downloadBtn = document.getElementById('downloadBtn');
-const regenAllBtn = document.getElementById('regenAllBtn');
 const errorDisplay = document.getElementById('errorDisplay');
-const voiceLabModal = document.getElementById('voiceLabModal');
-const cloneVoiceName = document.getElementById('cloneVoiceName');
-const cloneRefAudio = document.getElementById('cloneRefAudio');
-const cloneRefText = document.getElementById('cloneRefText');
-const cloneCancelBtn = document.getElementById('cloneCancelBtn');
-const cloneSaveBtn = document.getElementById('cloneSaveBtn');
-const chunkPanel = document.getElementById('chunkPanel');
 const chunkList = document.getElementById('chunkList');
 const mergeSection = document.getElementById('mergeSection');
 const mergeBtn = document.getElementById('mergeBtn');
@@ -2003,18 +2845,27 @@ const chunkPagination = document.getElementById('chunkPagination');
 const pagePrev = document.getElementById('pagePrev');
 const pageNext = document.getElementById('pageNext');
 const pageInfo = document.getElementById('pageInfo');
+const segmentFilters = document.getElementById('segmentFilters');
+const batchActions = document.getElementById('batchActions');
+const autosaveIndicator = document.getElementById('autosaveIndicator');
+const autosaveText = document.getElementById('autosaveText');
 
-let CHUNK_PAGE = 0;
-const CHUNK_PER_PAGE = 10;
-
-function toggleAdv(el) {
-  const p = document.getElementById('advPanel');
-  p.classList.toggle('hidden');
-  el.classList.toggle('open');
+function showFinalAudio() {
+  finalAudioBar.classList.add('visible');
+  finalAudioOverlay.classList.add('visible');
+  reopenFinalBtn.classList.remove('visible');
 }
 
+function hideFinalAudio() {
+  finalAudioBar.classList.remove('visible');
+  finalAudioOverlay.classList.remove('visible');
+  if (CURRENT_AUDIO_URL) reopenFinalBtn.classList.add('visible');
+}
+
+// Slider fills
 ['speedSlider','pitchSlider','volumeSlider'].forEach(id => {
   const el = document.getElementById(id);
+  if (!el) return;
   const valEl = document.getElementById(id.replace('Slider','Val'));
   function updateSliderFill() {
     const min = parseFloat(el.min);
@@ -2025,15 +2876,15 @@ function toggleAdv(el) {
   }
   el.addEventListener('input', function() {
     const v = this.value;
-    if (id === 'speedSlider') valEl.textContent = parseFloat(v).toFixed(1) + '×';
-    else if (id === 'volumeSlider') valEl.textContent = v + ' dB';
-    else valEl.textContent = v;
+    if (id === 'speedSlider' && valEl) valEl.textContent = parseFloat(v).toFixed(1) + '×';
+    else if (id === 'volumeSlider' && valEl) valEl.textContent = v + ' dB';
+    else if (valEl) valEl.textContent = v;
     updateSliderFill();
   });
   updateSliderFill();
 });
 
-// Model config sliders (F5 / OmniVoice)
+// Model config sliders
 ['cfgSlider','stepsSlider','swaySlider','numStepSlider'].forEach(id => {
   const el = document.getElementById(id);
   if (!el) return;
@@ -2050,53 +2901,77 @@ function toggleAdv(el) {
   el.style.background = `linear-gradient(to right, var(--accent-primary) 0%, var(--accent-primary) ${pct}%, var(--card-border) ${pct}%, var(--card-border) 100%)`;
 });
 
-progressCard.classList.add('hidden');
-outputCard.classList.add('hidden');
-
-let VOICE_RATES = {preset: 18, custom: {}};
-let PAUSE_CFG = {enabled: true, pauses: {'.': 0.4, ',': 0.2, ';': 0.3, ':': 0.3, '?': 0.4, '!': 0.4, linebreak: 0.6}};
-
-textInput.addEventListener('input', updateCharCount);
-
-function updateCharCount() {
-  const text = textInput.value;
-  const len = text.length;
-  charCount.textContent = len;
-  charCount.style.color = len > 4800 ? 'var(--error)' : 'var(--text-muted)';
-  const mode = document.querySelector('.toggle-btn.active').dataset.mode;
-  let rate = VOICE_RATES.preset;
-  if (CURRENT_VOICE_MODE === 'custom') {
-    rate = VOICE_RATES.custom[CURRENT_VOICE_ID] || 18;
+// Drop zone handling
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('dragover');
+  const file = e.dataTransfer.files[0];
+  if (file && (file.name.endsWith('.txt') || file.name.endsWith('.md'))) {
+    readFile(file);
   }
-  let estSec = len > 0 ? len / rate : 0;
-  if (PAUSE_CFG.enabled) {
-    const p = PAUSE_CFG.pauses;
-    for (const ch of Object.keys(p)) {
-      if (ch === 'linebreak') continue;
-      const count = (text.match(new RegExp('\\' + ch, 'g')) || []).length;
-      estSec += count * p[ch];
-    }
-    const lb = (text.match(/\n\s*\n/g) || []).length;
-    estSec += lb * (p.linebreak || 0);
-    const markers = text.match(/\[(\d+(?:\.\d+)?)\s*s\]/gi) || [];
-    for (const m of markers) {
-      const val = parseFloat(m.match(/[\d.]+/)[0]);
-      estSec += val;
-    }
+});
+dropZone.addEventListener('click', e => {
+  if (e.target === dropZone || e.target.closest('.drop-zone-hint')) {
+    fileInput.click();
   }
-  const rounded = Math.round(estSec);
-  const estMin = Math.floor(rounded / 60);
-  const estRem = rounded % 60;
-  const label = len > 0 ? ` (~${estMin > 0 ? estMin + 'm ' : ''}${estRem}s)` : '';
-  charCount.textContent = len + label;
+});
+fileInput.addEventListener('change', e => {
+  if (e.target.files[0]) readFile(e.target.files[0]);
+});
+
+function readFile(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    textInput.value = e.target.result;
+    textInput.dispatchEvent(new Event('input'));
+    showToast(`Loaded ${file.name}`);
+  };
+  reader.readAsText(file);
 }
 
-let CURRENT_VOICE_MODE = 'low';
-let CURRENT_VOICE_ID = 'banmai';
-let ALL_VOICES = {low: [], medium: [], high: []};
+// Text input handling
+textInput.addEventListener('input', () => {
+  updateCharCount();
+  if (textInput.value.trim()) {
+    dropZone.classList.remove('empty');
+  } else {
+    dropZone.classList.add('empty');
+  }
+  clearTimeout(AUTOSAVE_TIMER);
+  AUTOSAVE_TIMER = setTimeout(() => {
+    localStorage.setItem('tts_draft', textInput.value);
+    updateAutosaveIndicator();
+  }, 2000);
+});
 
-const QUALITY_LABELS = {low: 'Piper', medium: 'F5', high: 'OmniVoice'};
-const QUALITY_BADGE_CLASS = {low: 'piper', medium: 'f5', high: 'omnivoice'};
+// Load draft on startup
+const savedDraft = localStorage.getItem('tts_draft');
+if (savedDraft) {
+  textInput.value = savedDraft;
+  dropZone.classList.remove('empty');
+  textInput.dispatchEvent(new Event('input'));
+}
+
+// Input action buttons
+document.getElementById('clearTextBtn').addEventListener('click', () => {
+  if (textInput.value && !confirm('Clear all text?')) return;
+  textInput.value = '';
+  textInput.dispatchEvent(new Event('input'));
+});
+
+document.getElementById('saveDraftBtn').addEventListener('click', () => {
+  localStorage.setItem('tts_draft', textInput.value);
+  showToast('Draft saved');
+  updateAutosaveIndicator();
+});
+
+function updateAutosaveIndicator() {
+  autosaveIndicator.style.display = 'flex';
+  const now = new Date();
+  autosaveText.textContent = `Saved ${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`;
+}
 
 voiceModeToggle.addEventListener('click', e => {
   const btn = e.target.closest('.toggle-btn');
@@ -2229,6 +3104,50 @@ function getCurrentVoiceLabel() {
   const list = ALL_VOICES[CURRENT_VOICE_MODE] || [];
   const v = list.find(x => x.id === CURRENT_VOICE_ID);
   return v ? v.label : CURRENT_VOICE_ID;
+}
+
+function updateCharCount() {
+  const text = textInput.value;
+  const len = text.length;
+  const words = len > 0 ? text.split(/\s+/).filter(w => w.length > 0).length : 0;
+  
+  charCount.textContent = `${len.toLocaleString()} chars`;
+  charCount.style.color = len > 4800 ? 'var(--error)' : 'var(--text-muted)';
+  
+  if (wordCount) wordCount.textContent = `${words.toLocaleString()} words`;
+  
+  const mode = document.querySelector('.toggle-btn.active').dataset.mode;
+  let rate = VOICE_RATES.preset;
+  if (CURRENT_VOICE_MODE === 'custom') {
+    rate = VOICE_RATES.custom[CURRENT_VOICE_ID] || 18;
+  }
+  let estSec = len > 0 ? len / rate : 0;
+  if (PAUSE_CFG.enabled) {
+    const p = PAUSE_CFG.pauses;
+    for (const ch of Object.keys(p)) {
+      if (ch === 'linebreak') continue;
+      const count = (text.match(new RegExp('\\' + ch, 'g')) || []).length;
+      estSec += count * p[ch];
+    }
+    const lb = (text.match(/\n\s*\n/g) || []).length;
+    estSec += lb * (p.linebreak || 0);
+    const markers = text.match(/\[(\d+(?:\.\d+)?)\s*s\]/gi) || [];
+    for (const m of markers) {
+      const val = parseFloat(m.match(/[\d.]+/)[0]);
+      estSec += val;
+    }
+  }
+  
+  const rounded = Math.round(estSec);
+  const estMin = Math.floor(rounded / 60);
+  const estRem = rounded % 60;
+  const durationStr = estMin > 0 ? `~${estMin}m ${estRem}s` : `~${estRem}s`;
+  
+  if (estDuration) estDuration.textContent = `${durationStr} audio`;
+  
+  const splitEnabled = document.getElementById('splitSegmentsCheckbox').checked;
+  const estSegCount = splitEnabled && len > 0 ? Math.ceil(len / 400) : 1;
+  if (estSegments) estSegments.textContent = `${estSegCount} segment${estSegCount !== 1 ? 's' : ''}`;
 }
 
 /* Voice Modal */
@@ -2379,13 +3298,15 @@ async function startGeneration() {
   if (!CURRENT_VOICE_ID) { showError('Select a voice'); return; }
 
   hideError();
-  outputCard.classList.add('hidden');
-  progressCard.classList.remove('hidden');
+  hideFinalAudio();
+  progressFloat.classList.add('visible');
   mergeSection.classList.add('hidden');
   setProgress(0, 'Starting...');
   resetBtn.style.display = 'inline-flex';
   generateBtn.disabled = true;
   STATE = 'loading';
+  GENERATION_PAUSED = false;
+  GENERATION_START_TIME = Date.now();
 
   try {
     const res = await fetch(`${API_BASE}/tts/generate`, {
@@ -2415,8 +3336,8 @@ function pollStatus(taskId) {
         onChunksDone(data);
       } else if (data.status === 'done') {
         clearInterval(POLL_INTERVAL); POLL_INTERVAL = null;
-        progressCard.classList.add('hidden');
-        outputCard.classList.remove('hidden');
+        progressFloat.classList.remove('visible');
+        showFinalAudio();
         CURRENT_AUDIO_URL = `${API_BASE}${data.audio_url}`;
         loadAudio(CURRENT_AUDIO_URL);
         generateBtn.disabled = false; resetBtn.style.display = 'inline-flex'; STATE = 'done';
@@ -2434,12 +3355,18 @@ function pollStatus(taskId) {
 function onChunksDone(data) {
   STATE = 'chunks_done';
   generateBtn.disabled = false;
-  progressCard.classList.add('hidden');
+  progressFloat.classList.remove('visible');
   const chunks = data.chunks || [];
   if (chunks.length > 1) {
     mergeSection.classList.remove('hidden');
+  } else if (chunks.length === 1 && chunks[0].status === 'done') {
+    // Single chunk (split OFF) — show in Final Audio bar
+    CURRENT_AUDIO_URL = `${API_BASE}${chunks[0].audio_url}`;
+    loadAudio(CURRENT_AUDIO_URL);
+    showFinalAudio();
   }
   resetBtn.style.display = 'inline-flex';
+  updateAutosaveIndicator();
 }
 
 async function doMerge() {
@@ -2452,15 +3379,75 @@ async function doMerge() {
     });
     if (!res.ok) throw new Error('Merge failed');
     const data = await res.json();
-    outputCard.classList.remove('hidden');
+    showFinalAudio();
     CURRENT_AUDIO_URL = `${API_BASE}${data.audio_url}`;
     loadAudio(CURRENT_AUDIO_URL);
+    updateFinalAudioMetadata();
   } catch (e) { showError('Auto-merge: ' + e.message); }
 }
 
+function updateFinalAudioMetadata() {
+  const chunks = CHUNK_DATA || [];
+  const doneChunks = chunks.filter(c => c.status === 'done');
+  
+  // Get audio duration
+  if (audioPlayer.duration && !isNaN(audioPlayer.duration)) {
+    const dur = audioPlayer.duration;
+    const min = Math.floor(dur / 60);
+    const sec = Math.floor(dur % 60);
+    document.getElementById('finalDuration').innerHTML = `
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      Duration: ${min}:${sec.toString().padStart(2,'0')}`;
+  }
+  
+  document.getElementById('finalSegments').innerHTML = `
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+    Segments: ${doneChunks.length}`;
+  
+  document.getElementById('finalVoice').innerHTML = `
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/></svg>
+    Voice: ${getCurrentVoiceLabel()}`;
+}
+
+audioPlayer.addEventListener('loadedmetadata', updateFinalAudioMetadata);
+
 function setProgress(pct, label) {
-  progressFill.style.width = Math.min(pct, 100) + '%';
-  progressLabel.textContent = label ? label.replace(/_/g, ' ') + ` ${Math.round(pct)}%` : `${Math.round(pct)}%`;
+  floatFill.style.width = Math.min(pct, 100) + '%';
+  
+  const chunks = CHUNK_DATA || [];
+  const done = chunks.filter(c => c.status === 'done').length;
+  const total = chunks.length;
+  
+  if (total > 0) {
+    floatCount.textContent = `${done} / ${total}`;
+  } else if (label) {
+    floatCount.textContent = `${Math.round(pct)}%`;
+  } else {
+    floatCount.textContent = `${Math.round(pct)}%`;
+  }
+  
+  if (GENERATION_PAUSED) {
+    floatStatus.textContent = 'Paused';
+  } else if (pct < 100) {
+    floatStatus.textContent = 'Generating audio...';
+  } else {
+    floatStatus.textContent = 'Complete';
+  }
+  
+  // Elapsed time
+  if (GENERATION_START_TIME && pct < 100) {
+    const elapsed = (Date.now() - GENERATION_START_TIME) / 1000;
+    const min = Math.floor(elapsed / 60);
+    const sec = Math.floor(elapsed % 60);
+    floatEta.textContent = `${min}:${sec.toString().padStart(2, '0')} elapsed`;
+  } else if (pct >= 100) {
+    const total = (Date.now() - GENERATION_START_TIME) / 1000;
+    const min = Math.floor(total / 60);
+    const sec = Math.floor(total % 60);
+    floatEta.textContent = `Done in ${min}:${sec.toString().padStart(2, '0')}`;
+  } else {
+    floatEta.textContent = '0:00';
+  }
 }
 
 function drawWaveform(audioUrl) {
@@ -2482,7 +3469,6 @@ function drawWaveform(audioUrl) {
   }).then(audioBuffer => {
     const data = audioBuffer.getChannelData(0);
     const step = Math.max(1, Math.floor(data.length / w));
-    ctx.fillStyle = '#5b7a6a';
     for (let i = 0; i < w; i++) {
       let peak = 0;
       const start = i * step;
@@ -2492,13 +3478,110 @@ function drawWaveform(audioUrl) {
         if (v > peak) peak = v;
       }
       const barH = peak * h * 0.8;
-      ctx.fillRect(i, (h - barH) / 2, 2, Math.max(1, barH));
+      const progress = audioPlayer.duration > 0 ? audioPlayer.currentTime / audioPlayer.duration : 0;
+      if (i / w < progress) {
+        ctx.fillStyle = '#5b7a6a';
+      } else {
+        ctx.fillStyle = '#4a4a4a';
+      }
+      ctx.fillRect(i, (h - barH) / 2, 1, Math.max(1, barH));
     }
   }).catch(e => {
     ctx.fillStyle = '#666';
     ctx.font = '12px sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText('Waveform unavailable', w/2, h/2);
+  });
+}
+
+// Custom player controls
+const cpPlayBtn = document.getElementById('cpPlayBtn');
+const cpTime = document.getElementById('cpTime');
+const cpProgressBg = document.getElementById('cpProgressBg');
+const cpProgressFill = document.getElementById('cpProgressFill');
+const cpVolBtn = document.getElementById('cpVolBtn');
+const cpVolSlider = document.getElementById('cpVolSlider');
+const cpSpeedBtn = document.getElementById('cpSpeedBtn');
+
+const SPEEDS = [0.75, 1, 1.25, 1.5, 2];
+let speedIdx = 1;
+
+function formatTime(s) {
+  if (!s || isNaN(s)) return '0:00';
+  const m = Math.floor(s / 60);
+  const sec = Math.floor(s % 60);
+  return `${m}:${sec.toString().padStart(2, '0')}`;
+}
+
+function updatePlayIcon() {
+  cpPlayBtn.innerHTML = audioPlayer.paused
+    ? '<svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>'
+    : '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>';
+}
+
+cpPlayBtn.addEventListener('click', () => {
+  if (audioPlayer.paused) audioPlayer.play().catch(() => {});
+  else audioPlayer.pause();
+});
+
+cpProgressBg.addEventListener('click', e => {
+  if (!audioPlayer.duration) return;
+  const rect = cpProgressBg.getBoundingClientRect();
+  audioPlayer.currentTime = ((e.clientX - rect.left) / rect.width) * audioPlayer.duration;
+});
+
+cpVolSlider.addEventListener('input', () => {
+  audioPlayer.volume = parseFloat(cpVolSlider.value);
+});
+
+cpSpeedBtn.addEventListener('click', () => {
+  speedIdx = (speedIdx + 1) % SPEEDS.length;
+  audioPlayer.playbackRate = SPEEDS[speedIdx];
+  cpSpeedBtn.textContent = SPEEDS[speedIdx] + '×';
+});
+
+audioPlayer.addEventListener('play', updatePlayIcon);
+audioPlayer.addEventListener('pause', updatePlayIcon);
+audioPlayer.addEventListener('timeupdate', () => {
+  if (!audioPlayer.duration) return;
+  cpTime.textContent = `${formatTime(audioPlayer.currentTime)} / ${formatTime(audioPlayer.duration)}`;
+  cpProgressFill.style.width = ((audioPlayer.currentTime / audioPlayer.duration) * 100) + '%';
+});
+
+// Waveform seek interaction
+const waveformWrap = document.getElementById('waveformWrap');
+const waveformSeek = document.getElementById('waveformSeek');
+const waveformTime = document.getElementById('waveformTime');
+
+if (waveformWrap) {
+  waveformWrap.addEventListener('click', e => {
+    if (!audioPlayer.duration) return;
+    const rect = waveformWrap.getBoundingClientRect();
+    const pct = (e.clientX - rect.left) / rect.width;
+    audioPlayer.currentTime = pct * audioPlayer.duration;
+  });
+
+  waveformWrap.addEventListener('mousemove', e => {
+    if (!audioPlayer.duration) return;
+    const rect = waveformWrap.getBoundingClientRect();
+    const pct = (e.clientX - rect.left) / rect.width;
+    const hoverTime = pct * audioPlayer.duration;
+    const min = Math.floor(hoverTime / 60);
+    const sec = Math.floor(hoverTime % 60);
+    waveformTime.textContent = `${min}:${sec.toString().padStart(2, '0')}`;
+    waveformSeek.style.width = (pct * 100) + '%';
+  });
+
+  waveformWrap.addEventListener('mouseleave', () => {
+    const progress = audioPlayer.duration > 0 ? audioPlayer.currentTime / audioPlayer.duration : 0;
+    waveformSeek.style.width = (progress * 100) + '%';
+    waveformTime.style.opacity = '0';
+  });
+
+  audioPlayer.addEventListener('timeupdate', () => {
+    if (!audioPlayer.duration) return;
+    const progress = audioPlayer.currentTime / audioPlayer.duration;
+    waveformSeek.style.width = (progress * 100) + '%';
   });
 }
 
@@ -2511,19 +3594,19 @@ function loadAudio(url) {
 function onError(msg) {
   STATE = 'error';
   generateBtn.disabled = false;
-  progressCard.classList.add('hidden');
+  progressFloat.classList.remove('visible');
   showError(msg);
 }
 
 mergeBtn.addEventListener('click', async () => {
   if (!CURRENT_TASK_ID) return;
   mergeBtn.disabled = true; mergeBtn.textContent = 'Merging...';
-  progressCard.classList.remove('hidden');
+  progressFloat.classList.add('visible');
   setProgress(90, 'Merging audio...');
   await doMerge();
   mergeBtn.disabled = false; mergeBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;"><path d="M8 6L21 6"/><path d="M8 12L21 12"/><path d="M8 18L21 18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg> Merge &amp; Download All';
   mergeSection.classList.add('hidden');
-  progressCard.classList.add('hidden');
+  progressFloat.classList.remove('visible');
 });
 
 downloadBtn.addEventListener('click', () => {
@@ -2534,10 +3617,18 @@ downloadBtn.addEventListener('click', () => {
   a.href = url; a.download = `tts_output.${fmt}`; a.click();
 });
 
-regenAllBtn.addEventListener('click', () => {
-  outputCard.classList.add('hidden');
-  startGeneration();
+document.getElementById('remergeBtn').addEventListener('click', async () => {
+  if (!CURRENT_TASK_ID) return;
+  await doMerge();
+  showToast('Re-merged audio');
 });
+
+// Close final audio bar
+document.getElementById('closeFinalAudio').addEventListener('click', hideFinalAudio);
+finalAudioOverlay.addEventListener('click', hideFinalAudio);
+
+// Reopen final audio bar
+reopenFinalBtn.addEventListener('click', showFinalAudio);
 
 resetBtn.addEventListener('click', async () => {
   if (!CURRENT_TASK_ID) return;
@@ -2551,12 +3642,28 @@ resetBtn.addEventListener('click', async () => {
   if (POLL_INTERVAL) { clearInterval(POLL_INTERVAL); POLL_INTERVAL = null; }
   STATE = 'idle';
   generateBtn.disabled = false;
-  progressCard.classList.add('hidden');
-  outputCard.classList.add('hidden');
+  progressFloat.classList.remove('visible');
+  hideFinalAudio();
+  reopenFinalBtn.classList.remove('visible');
   mergeSection.classList.add('hidden');
   chunkList.innerHTML = '<div class="no-chunks">Enter text and click Generate to see segments</div>';
   resetBtn.style.display = 'none';
   hideError();
+});
+
+floatCancelBtn.addEventListener('click', async () => {
+  if (!CURRENT_TASK_ID) return;
+  if (!confirm('Cancel generation?')) return;
+  if (POLL_INTERVAL) { clearInterval(POLL_INTERVAL); POLL_INTERVAL = null; }
+  try {
+    await fetch(`${API_BASE}/tts/reset/${CURRENT_TASK_ID}`, { method: 'POST' });
+  } catch (_) {}
+  CURRENT_TASK_ID = null;
+  STATE = 'idle';
+  generateBtn.disabled = false;
+  progressFloat.classList.remove('visible');
+  resetBtn.style.display = 'none';
+  showToast('Generation cancelled');
 });
 
 /* Dictionary button */
@@ -2729,49 +3836,109 @@ async function deleteHistory(id) {
   await loadHistory();
 }
 
+function toggleSingleEdit() {
+  const display = document.getElementById('singleTextDisplay');
+  const ta = document.getElementById('singleTextEdit');
+  const btn = document.getElementById('singleEditBtn');
+  if (!display || !ta) return;
+  if (ta.style.display === 'none') {
+    display.style.display = 'none';
+    ta.style.display = 'block';
+    ta.focus();
+    ta.style.borderColor = 'var(--accent-primary)';
+    btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;"><polyline points="20 6 9 17 4 12"/></svg> Save';
+  } else {
+    display.style.display = 'block';
+    ta.style.display = 'none';
+    display.textContent = ta.value;
+    const c = CHUNK_DATA.find(x => x.index === 0);
+    if (c) c.text = ta.value.trim();
+    btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Edit';
+    showToast('Text updated');
+  }
+}
+
+async function retrySingle() {
+  const btn = document.getElementById('singleRetryBtn');
+  if (!btn) return;
+  const ta = document.getElementById('singleTextEdit');
+  const display = document.getElementById('singleTextDisplay');
+  const text = ta && ta.style.display !== 'none' ? ta.value.trim() : (display ? display.textContent.trim() : '');
+  if (!text) return;
+  
+  btn.disabled = true;
+  btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;animation:spin 1s linear infinite;"><circle cx="12" cy="12" r="10" stroke-dasharray="30 70"/></svg> Retrying...';
+  
+  await _regenChunk(0, text);
+  
+  btn.disabled = false;
+  btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg> Retry';
+}
+
 /* Chunk rendering */
 function renderChunks(chunks) {
   if (!chunks || chunks.length === 0) {
-    chunkList.innerHTML = '<div class="no-chunks">No segments yet</div>';
+    chunkList.innerHTML = '<div class="no-chunks">No segments yet. Generate audio to begin.</div>';
     chunkCount.textContent = '';
     chunkPagination.style.display = 'none';
     mergeSection.classList.add('hidden');
+    segmentFilters.style.display = 'none';
+    batchActions.style.display = 'none';
     return;
   }
+  
   CHUNK_DATA = chunks;
-  chunkCount.textContent = `(${chunks.length} segments)`;
+  const doneCount = chunks.filter(c => c.status === 'done').length;
+  const warningCount = chunks.filter(c => c.warning).length;
+  const errorCount = chunks.filter(c => c.status === 'error').length;
+  
+  chunkCount.textContent = `(${chunks.length} segments · ${doneCount} done${warningCount > 0 ? ` · ${warningCount} ⚠` : ''}${errorCount > 0 ? ` · ${errorCount} ✗` : ''})`;
+  
+  // Show filters and batch actions when multiple chunks
+  if (chunks.length > 1) {
+    segmentFilters.style.display = 'flex';
+    batchActions.style.display = 'flex';
+  } else {
+    segmentFilters.style.display = 'none';
+    batchActions.style.display = 'none';
+  }
+  
   chunkPagination.style.display = 'none';
+
+  // Filter chunks
+  let filteredChunks = chunks;
+  if (CURRENT_FILTER !== 'all') {
+    if (CURRENT_FILTER === 'done') filteredChunks = chunks.filter(c => c.status === 'done');
+    else if (CURRENT_FILTER === 'warning') filteredChunks = chunks.filter(c => c.warning);
+    else if (CURRENT_FILTER === 'failed') filteredChunks = chunks.filter(c => c.status === 'error');
+    else if (CURRENT_FILTER === 'processing') filteredChunks = chunks.filter(c => c.status === 'processing');
+  }
 
   // Single chunk (non-split mode)
   if (chunks.length === 1) {
     const c = chunks[0];
     const isDone = c.status === 'done';
+    const isProcessing = c.status === 'processing';
     chunkList.innerHTML = `
       <div class="card" style="margin:0;padding:16px;background:var(--bg-primary);border-radius:var(--radius-md);min-height:200px;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
           <span style="font-size:12px;color:var(--text-muted);font-weight:600;text-transform:uppercase;">Generated Audio</span>
+          <div style="display:flex;gap:6px;">
+            ${isDone ? `<button class="btn-sm" id="singleEditBtn" onclick="toggleSingleEdit()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+              Edit
+            </button>` : ''}
+            ${isDone ? `<button class="btn-sm" id="singleRetryBtn" onclick="retrySingle()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+              Retry
+            </button>` : ''}
+          </div>
         </div>
-        <div id="chunkBody_0" class="open">
-          <div style="width:100%;min-height:120px;font-size:13px;background:var(--card-bg);border:1px solid var(--card-border);border-radius:var(--radius-sm);padding:10px;color:var(--text-primary);white-space:pre-wrap;word-break:break-word;">${escapeHtml(c.text)}</div>
-        </div>
-        ${isDone ? `
-        <div style="display:flex;gap:10px;margin-top:12px;align-items:center;flex-wrap:wrap;">
-          <audio src="${API_BASE}${c.audio_url}" controls style="flex:1;min-width:200px;height:40px;border-radius:var(--radius-sm);"></audio>
-          <select id="singleFormatSelect" style="padding:6px 10px;border:1px solid var(--card-border);border-radius:var(--radius-sm);font-size:12px;background:var(--card-bg);color:var(--text-secondary);">
-            <option value="mp3">MP3</option>
-            <option value="wav">WAV</option>
-          </select>
-          <button class="btn btn-primary btn-sm" onclick="regenChunk(0)" style="white-space:nowrap;">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
-            Regenerate
-          </button>
-          <button class="btn btn-success btn-sm" onclick="downloadChunk(0)">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            Download
-          </button>
-        </div>` : `
+        <div id="singleTextDisplay" style="width:100%;min-height:120px;font-size:13px;background:var(--card-bg);border:1px solid var(--card-border);border-radius:var(--radius-sm);padding:10px;color:var(--text-primary);white-space:pre-wrap;word-break:break-word;">${escapeHtml(c.text)}</div>
+        <textarea id="singleTextEdit" style="display:none;width:100%;min-height:120px;font-size:13px;background:var(--card-bg);border:1px solid var(--card-border);border-radius:var(--radius-sm);padding:10px;color:var(--text-primary);font-family:inherit;resize:vertical;outline:none;">${escapeHtml(c.text)}</textarea>
+        ${isDone ? `<div style="margin-top:12px;text-align:center;color:var(--text-muted);font-size:13px;">✓ Audio ready — see Final Audio bar below</div>` : `
         <div style="margin-top:12px;text-align:center;color:var(--text-muted);font-size:13px;padding:20px;">
-          ${c.status === 'processing' ? 'Generating...' : 'Queued...'}
+          ${isProcessing ? '<span style="display:inline-block;width:12px;height:12px;border:2px solid var(--card-border);border-top-color:var(--accent-primary);border-radius:50%;animation:spin 0.8s linear infinite;vertical-align:middle;margin-right:6px;"></span>Generating...' : 'Queued...'}
         </div>`}
       </div>`;
     mergeSection.classList.add('hidden');
@@ -2781,7 +3948,7 @@ function renderChunks(chunks) {
   function downloadChunk(index) {
     const d = CHUNK_DATA.find(x => x.index === index);
     if (!d || !d.audio_url) return;
-    const fmt = document.getElementById('singleFormatSelect')?.value || 'mp3';
+    const fmt = formatSelect.value || 'mp3';
     const a = document.createElement('a');
     a.href = `${API_BASE}${d.audio_url}&format=${fmt}`;
     a.download = `tts_output.${fmt}`;
@@ -2789,12 +3956,12 @@ function renderChunks(chunks) {
   }
 
   // Multiple chunks (split mode) — show compact list with pagination
-  const totalPages = Math.ceil(chunks.length / CHUNK_PER_PAGE);
+  const totalPages = Math.ceil(filteredChunks.length / CHUNK_PER_PAGE);
   if (CHUNK_PAGE >= totalPages) CHUNK_PAGE = totalPages - 1;
   if (CHUNK_PAGE < 0) CHUNK_PAGE = 0;
 
   const start = CHUNK_PAGE * CHUNK_PER_PAGE;
-  const pageChunks = chunks.slice(start, start + CHUNK_PER_PAGE);
+  const pageChunks = filteredChunks.slice(start, start + CHUNK_PER_PAGE);
 
   if (totalPages > 1) {
     chunkPagination.style.display = 'flex';
@@ -2807,34 +3974,40 @@ function renderChunks(chunks) {
 
   let html = '';
   for (const c of pageChunks) {
-    const statusClass = c.status === 'processing' ? 'processing' : c.status === 'done' ? 'done' : c.status === 'error' ? 'error' : '';
-    const icon = c.status === 'pending' ? '&#9679;' : c.status === 'processing' ? '&#9696;' : c.status === 'done' ? '&#10003;' : c.status === 'error' ? '&#10007;' : '&#9679;';
-    const iconColor = c.status === 'pending' ? 'var(--text-muted)' : c.status === 'processing' ? 'var(--accent-primary)' : c.status === 'done' ? 'var(--success)' : 'var(--error)';
-    const preview = c.text.length > 50 ? c.text.slice(0, 50) + '...' : c.text;
+    const hasWarning = c.warning || false;
+    const statusClass = c.status === 'processing' ? 'processing' : c.status === 'done' ? (hasWarning ? 'warning' : 'done') : c.status === 'error' ? 'error' : '';
+    const icon = c.status === 'pending' ? '<svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><circle cx="12" cy="12" r="4"/></svg>' : c.status === 'processing' ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:14px;height:14px;animation:spin 1s linear infinite;"><circle cx="12" cy="12" r="10" stroke-dasharray="30 70"/></svg>' : c.status === 'done' ? (hasWarning ? '<svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M12 2L1 21h22L12 2zm0 4l7.53 13H4.47L12 6z"/><circle cx="12" cy="15" r="1.5"/><line x1="12" y1="9" x2="12" y2="12" stroke="currentColor" stroke-width="2"/></svg>' : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="width:14px;height:14px;"><polyline points="20 6 9 17 4 12"/></svg>') : c.status === 'error' ? '<svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>' : '<svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><circle cx="12" cy="12" r="4"/></svg>';
+    const iconColor = c.status === 'pending' ? 'var(--text-muted)' : c.status === 'processing' ? '#4a9e7a' : c.status === 'done' ? (hasWarning ? '#d4a832' : 'var(--success)') : '#c44';
+    const preview = c.text.length > 60 ? c.text.slice(0, 60) + '...' : c.text;
+    const duration = c.duration ? ` ${formatDuration(c.duration)}` : '';
+    const glowClass = c.status === 'processing' ? 'segment-glow' : '';
+    
     html += `
-      <div class="chunk-item ${statusClass}" data-index="${c.index}">
+      <div class="chunk-item ${statusClass} ${glowClass}" data-index="${c.index}" data-status="${c.status}" data-warning="${hasWarning}">
         <div class="chunk-header" onclick="toggleChunk(${c.index})">
           <span class="chunk-index">${c.index + 1}</span>
           <span class="chunk-status-icon" style="color:${iconColor}">${icon}</span>
           <span class="chunk-text-preview">${escapeHtml(preview)}</span>
+          ${duration ? `<span style="font-size:11px;color:var(--text-muted);font-family:'JetBrains Mono',monospace;flex-shrink:0;">${duration}</span>` : ''}
           <span class="chunk-actions">
             ${c.status === 'done' ? `<button onclick="event.stopPropagation();playChunk(${c.index})" title="Play"><svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg></button>` : ''}
             ${c.status === 'done' || c.status === 'error' ? `<button onclick="event.stopPropagation();retryChunk(${c.index})" title="Retry"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg></button>` : ''}
-            <button onclick="event.stopPropagation();toggleChunk(${c.index})" title="Edit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+            <button onclick="event.stopPropagation();toggleEdit(${c.index})" title="Edit" id="editBtn_${c.index}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
           </span>
         </div>
         <div class="chunk-body" id="chunkBody_${c.index}">
-          <textarea id="chunkText_${c.index}">${escapeHtml(c.text)}</textarea>
-          <div class="chunk-body-actions">
-            <button class="btn btn-primary btn-sm" onclick="regenChunk(${c.index})">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
-              Re-generate
-            </button>
-          </div>
+          <textarea id="chunkText_${c.index}" readonly>${escapeHtml(c.text)}</textarea>
+          ${hasWarning ? `<div style="margin-top:8px;padding:8px 12px;background:var(--warning-light);border-radius:var(--radius-sm);font-size:12px;color:var(--warning);">⚠ ${c.warning_message || 'Audio quality warning detected'}</div>` : ''}
         </div>
       </div>`;
   }
   chunkList.innerHTML = html;
+}
+
+function formatDuration(seconds) {
+  const min = Math.floor(seconds / 60);
+  const sec = Math.floor(seconds % 60);
+  return min > 0 ? `${min}:${sec.toString().padStart(2,'0')}` : `0:${sec.toString().padStart(2,'0')}`;
 }
 
 pagePrev.addEventListener('click', () => { if (CHUNK_PAGE > 0) { CHUNK_PAGE--; renderChunks(CHUNK_DATA); } });
@@ -2843,9 +4016,89 @@ pageNext.addEventListener('click', () => {
   if (CHUNK_PAGE < totalPages - 1) { CHUNK_PAGE++; renderChunks(CHUNK_DATA); }
 });
 
+// Segment filters
+document.querySelectorAll('.segment-filter-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.segment-filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    CURRENT_FILTER = btn.dataset.filter;
+    CHUNK_PAGE = 0;
+    renderChunks(CHUNK_DATA);
+  });
+});
+
+// Batch actions
+document.getElementById('retryFailedBtn').addEventListener('click', async () => {
+  const failed = CHUNK_DATA.filter(c => c.status === 'error');
+  if (failed.length === 0) { showToast('No failed segments'); return; }
+  for (const c of failed) {
+    await _regenChunk(c.index, c.text);
+  }
+  showToast(`Retrying ${failed.length} failed segment${failed.length > 1 ? 's' : ''}`);
+});
+
+document.getElementById('retryWarningBtn').addEventListener('click', async () => {
+  const warnings = CHUNK_DATA.filter(c => c.warning);
+  if (warnings.length === 0) { showToast('No warning segments'); return; }
+  for (const c of warnings) {
+    await _regenChunk(c.index, c.text);
+  }
+  showToast(`Retrying ${warnings.length} warning segment${warnings.length > 1 ? 's' : ''}`);
+});
+
+document.getElementById('collapseAllBtn').addEventListener('click', () => {
+  document.querySelectorAll('.chunk-body').forEach(body => body.classList.remove('open'));
+});
+
+document.getElementById('expandFailedBtn').addEventListener('click', () => {
+  document.querySelectorAll('.chunk-body').forEach(body => body.classList.remove('open'));
+  CHUNK_DATA.filter(c => c.status === 'error' || c.warning).forEach(c => {
+    const body = document.getElementById(`chunkBody_${c.index}`);
+    if (body) body.classList.add('open');
+  });
+});
+
+function toggleAdv(el) {
+  const p = document.getElementById('advPanel');
+  p.classList.toggle('hidden');
+  el.classList.toggle('open');
+}
+
 function toggleChunk(index) {
   const body = document.getElementById(`chunkBody_${index}`);
   if (body) body.classList.toggle('open');
+}
+
+function toggleEdit(index) {
+  const ta = document.getElementById(`chunkText_${index}`);
+  const body = document.getElementById(`chunkBody_${index}`);
+  const btn = document.getElementById(`editBtn_${index}`);
+  if (!ta || !body) return;
+  
+  // Expand body if collapsed
+  if (!body.classList.contains('open')) {
+    body.classList.add('open');
+  }
+  
+  // Toggle readonly
+  if (ta.readOnly) {
+    ta.readOnly = false;
+    ta.focus();
+    ta.style.borderColor = 'var(--accent-primary)';
+    ta.style.boxShadow = '0 0 0 3px rgba(91,122,106,0.1)';
+    btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+    btn.title = 'Save';
+  } else {
+    ta.readOnly = true;
+    ta.style.borderColor = '';
+    ta.style.boxShadow = '';
+    btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
+    btn.title = 'Edit';
+    // Update chunk data with edited text
+    const c = CHUNK_DATA.find(x => x.index === index);
+    if (c) c.text = ta.value.trim();
+    showToast('Segment ' + (index + 1) + ' updated');
+  }
 }
 
 function escapeHtml(s) {
@@ -2881,17 +4134,21 @@ function playChunk(index) {
 }
 
 async function retryChunk(index) {
+  const btn = document.querySelector(`.chunk-item[data-index="${index}"] .chunk-actions button[title="Retry"]`);
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;animation:spin 1s linear infinite;"><circle cx="12" cy="12" r="10" stroke-dasharray="30 70"/></svg>';
+  }
   const ta = document.getElementById(`chunkText_${index}`);
-  const text = ta ? ta.value.trim() : '';
+  const text = ta ? ta.value.trim() : (CHUNK_DATA.find(x => x.index === index)?.text || '');
   if (!text) return;
+  const c = CHUNK_DATA.find(x => x.index === index);
+  if (c && ta) c.text = text;
   await _regenChunk(index, text);
-}
-
-async function regenChunk(index) {
-  const ta = document.getElementById(`chunkText_${index}`);
-  const text = ta ? ta.value.trim() : '';
-  if (!text) return;
-  await _regenChunk(index, text);
+  if (btn) {
+    btn.disabled = false;
+    btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>';
+  }
 }
 
 async function _regenChunk(index, text) {
@@ -3296,6 +4553,28 @@ document.getElementById('helpCloseBtn').addEventListener('click', () => {
 });
 document.getElementById('helpModal').addEventListener('click', e => {
   if (e.target === e.currentTarget) document.getElementById('helpModal').classList.add('hidden');
+});
+
+// Keyboard shortcuts
+document.addEventListener('keydown', e => {
+  // Don't trigger shortcuts when typing in inputs
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+  
+  if (e.code === 'Space') {
+    e.preventDefault();
+    if (audioPlayer.src) {
+      audioPlayer.paused ? audioPlayer.play().catch(() => {}) : audioPlayer.pause();
+    }
+  } else if (e.key === 'r' || e.key === 'R') {
+    // Retry first failed segment
+    const failed = CHUNK_DATA.find(c => c.status === 'error');
+    if (failed) retryChunk(failed.index);
+  } else if (e.ctrlKey && e.key === 'Enter') {
+    e.preventDefault();
+    if (STATE === 'idle' || STATE === 'done' || STATE === 'error') {
+      startGeneration();
+    }
+  }
 });
 
 updateCharCount(); updateSplitCheckbox(); updateModelConfig(); loadVoices();
