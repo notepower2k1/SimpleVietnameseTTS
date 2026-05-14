@@ -234,7 +234,7 @@ from tts_engine import (
 
 # ─── Synthesis ───
 
-def _synthesize_one(piper_engine, f5_engine, omnivoice_engine, engine_type: str, text: str, voice_id: str, speed: float = 1.0, pitch: float = 0.0, volume: float = 0.0, normalize_audio: bool = True, cfg_strength: float = 2.0, steps: int = 32, sway: float = -1.0, num_step: int = 8):
+def _synthesize_one(piper_engine, f5_engine, omnivoice_engine, engine_type: str, text: str, voice_id: str, speed: float = 1.0, pitch: float = 0.0, volume: float = 0.0, normalize_audio: bool = True, cfg_strength: float = 2.0, steps: int = 32, sway: float = -1.0, num_step: int = 16):
     if engine_type == "high":
         audio = omnivoice_engine.synthesize(text, voice_id, speed=speed, cfg=cfg_strength, num_step=num_step)
         sr = 24000
@@ -320,7 +320,7 @@ def normalize_with_pause_protection(text: str) -> str:
             result.append(f'[{part}s]')
     return ''.join(result)
 
-def synthesize_with_pauses(piper_engine, f5_engine, omnivoice_engine, text: str, engine_type: str, voice_id: str, pause_cfg: dict, speed: float = 1.0, pitch: float = 0.0, volume: float = 0.0, normalize_audio: bool = True, skip_pause_split: bool = False, cfg_strength: float = 2.0, steps: int = 32, sway: float = -1.0, num_step: int = 8):
+def synthesize_with_pauses(piper_engine, f5_engine, omnivoice_engine, text: str, engine_type: str, voice_id: str, pause_cfg: dict, speed: float = 1.0, pitch: float = 0.0, volume: float = 0.0, normalize_audio: bool = True, skip_pause_split: bool = False, cfg_strength: float = 2.0, steps: int = 32, sway: float = -1.0, num_step: int = 16):
     def _synth(t, et, vid):
         return _synthesize_one(piper_engine, f5_engine, omnivoice_engine, et, t, vid, speed=speed, pitch=pitch, volume=volume, normalize_audio=normalize_audio, cfg_strength=cfg_strength, steps=steps, sway=sway, num_step=num_step)
 
@@ -444,7 +444,7 @@ class TTSRequest(BaseModel):
     cfg_strength: float = 2.0
     steps: int = 32
     sway: float = -1.0
-    num_step: int = 8
+    num_step: int = 16
 
 
 class ChunkRegenRequest(BaseModel):
@@ -714,7 +714,7 @@ async def _run_generation(task_id: str):
         cfg_val = task.get("cfg_strength", 2.0)
         steps_val = task.get("steps", 32)
         sway_val = task.get("sway", -1.0)
-        num_step_val = task.get("num_step", 8)
+        num_step_val = task.get("num_step", 16)
 
         if not split_seg:
             # Single-shot: whole text in one go (faster, less modular)

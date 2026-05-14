@@ -609,7 +609,7 @@ class OmniVoiceEngine:
         self._voice_prompts[voice_id] = prompt
         return prompt
 
-    def synthesize(self, text: str, voice_id: str, speed: float = 1.0, cfg: float = 2.0, num_step: int = 8) -> AudioSegment:
+    def synthesize(self, text: str, voice_id: str, speed: float = 1.0, cfg: float = 2.0, num_step: int = 16) -> AudioSegment:
         if not self._loaded:
             self.load()
 
@@ -685,7 +685,7 @@ class TaskManager:
         self._tasks: dict[str, dict] = {}
         self._lock = asyncio.Lock()
 
-    async def create(self, text: str, voice_mode: str, voice_id: str, output_format: str = "mp3", normalize: bool = False, clean: bool = False, normalize_audio: bool = True, speed: float = 1.0, pitch: float = 0.0, volume: float = 0.0, split_segments: bool = False, cfg_strength: float = 2.0, steps: int = 32, sway: float = -1.0, num_step: int = 8) -> str:
+    async def create(self, text: str, voice_mode: str, voice_id: str, output_format: str = "mp3", normalize: bool = False, clean: bool = False, normalize_audio: bool = True, speed: float = 1.0, pitch: float = 0.0, volume: float = 0.0, split_segments: bool = False, cfg_strength: float = 2.0, steps: int = 32, sway: float = -1.0, num_step: int = 16) -> str:
         task_id = uuid.uuid4().hex[:12]
         engine_type = voice_mode if voice_mode in ("preset", "custom") else "preset"
         raw_chunks = chunk_text_sentences(text)
