@@ -234,12 +234,12 @@ from tts_engine import (
 
 # ─── Synthesis ───
 
-def _synthesize_one(piper_engine, f5_engine, omnivoice_engine, engine_type: str, text: str, voice_id: str, speed: float = 1.0, pitch: float = 0.0, volume: float = 0.0, normalize_audio: bool = True):
+def _synthesize_one(piper_engine, f5_engine, omnivoice_engine, engine_type: str, text: str, voice_id: str, speed: float = 1.0, pitch: float = 0.0, volume: float = 0.0, normalize_audio: bool = True, cfg_strength: float = 2.0, steps: int = 32, sway: float = -1.0, num_step: int = 8):
     if engine_type == "high":
-        audio = omnivoice_engine.synthesize(text, voice_id, speed=speed)
+        audio = omnivoice_engine.synthesize(text, voice_id, speed=speed, cfg=cfg_strength, num_step=num_step)
         sr = 24000
     elif engine_type == "medium":
-        audio = f5_engine.synthesize(text, voice_id, speed=speed)
+        audio = f5_engine.synthesize(text, voice_id, speed=speed, cfg=cfg_strength, nfe=steps, sway=sway)
         sr = 24000
     else:
         audio = piper_engine.synthesize(text, voice_id, speed=speed)
@@ -320,9 +320,9 @@ def normalize_with_pause_protection(text: str) -> str:
             result.append(f'[{part}s]')
     return ''.join(result)
 
-def synthesize_with_pauses(piper_engine, f5_engine, omnivoice_engine, text: str, engine_type: str, voice_id: str, pause_cfg: dict, speed: float = 1.0, pitch: float = 0.0, volume: float = 0.0, normalize_audio: bool = True, skip_pause_split: bool = False):
+def synthesize_with_pauses(piper_engine, f5_engine, omnivoice_engine, text: str, engine_type: str, voice_id: str, pause_cfg: dict, speed: float = 1.0, pitch: float = 0.0, volume: float = 0.0, normalize_audio: bool = True, skip_pause_split: bool = False, cfg_strength: float = 2.0, steps: int = 32, sway: float = -1.0, num_step: int = 8):
     def _synth(t, et, vid):
-        return _synthesize_one(piper_engine, f5_engine, omnivoice_engine, et, t, vid, speed=speed, pitch=pitch, volume=volume, normalize_audio=normalize_audio)
+        return _synthesize_one(piper_engine, f5_engine, omnivoice_engine, et, t, vid, speed=speed, pitch=pitch, volume=volume, normalize_audio=normalize_audio, cfg_strength=cfg_strength, steps=steps, sway=sway, num_step=num_step)
 
     marker_parts = CUSTOM_PAUSE_RE.split(text)
     if skip_pause_split:
@@ -441,6 +441,10 @@ class TTSRequest(BaseModel):
     pitch: float = 0.0
     volume: float = 0.0
     split_segments: bool = False
+    cfg_strength: float = 2.0
+    steps: int = 32
+    sway: float = -1.0
+    num_step: int = 8
 
 
 class ChunkRegenRequest(BaseModel):
@@ -589,7 +593,7 @@ async def preview_tts(req: TTSRequest):
         loop = asyncio.get_running_loop()
         def _do():
             return synthesize_with_pauses(piper_engine, f5_engine, omnivoice_engine, preview_text, engine_type, voice_id, pause_cfg,
-                speed=req.speed, pitch=req.pitch, volume=req.volume)
+                speed=req.speed, pitch=req.pitch, volume=req.volume, cfg_strength=req.cfg_strength, steps=req.steps, sway=req.sway, num_step=req.num_step)
         if engine_type in ("medium", "high"):
             async with gpu_lock:
                 audio = await loop.run_in_executor(None, _do)
@@ -633,6 +637,10 @@ async def generate_tts(req: TTSRequest):
         pitch=req.pitch,
         volume=req.volume,
         split_segments=req.split_segments,
+        cfg_strength=req.cfg_strength,
+        steps=req.steps,
+        sway=req.sway,
+        num_step=req.num_step,
     )
 
     asyncio.create_task(_run_generation(task_id))
@@ -703,6 +711,10 @@ async def _run_generation(task_id: str):
         pit = task.get("pitch", 0.0)
         vol = task.get("volume", 0.0)
         norm_audio = task.get("normalize_audio", True)
+        cfg_val = task.get("cfg_strength", 2.0)
+        steps_val = task.get("steps", 32)
+        sway_val = task.get("sway", -1.0)
+        num_step_val = task.get("num_step", 8)
 
         if not split_seg:
             # Single-shot: whole text in one go (faster, less modular)
@@ -711,8 +723,8 @@ async def _run_generation(task_id: str):
             gen_text = gen_texts[0]
             if engine_type == "medium":
                 f5_engine._force_single = True
-            def _do_full(t=gen_text, et=engine_type, vid=voice_id, pc=pause_cfg, s=spd, p=pit, v=vol, na=norm_audio, sps=skip_ps):
-                return synthesize_with_pauses(piper_engine, f5_engine, omnivoice_engine, t, et, vid, pc, speed=s, pitch=p, volume=v, normalize_audio=na, skip_pause_split=sps)
+            def _do_full(t=gen_text, et=engine_type, vid=voice_id, pc=pause_cfg, s=spd, p=pit, v=vol, na=norm_audio, sps=skip_ps, cf=cfg_val, ns=steps_val, sw=sway_val, nms=num_step_val):
+                return synthesize_with_pauses(piper_engine, f5_engine, omnivoice_engine, t, et, vid, pc, speed=s, pitch=p, volume=v, normalize_audio=na, skip_pause_split=sps, cfg_strength=cf, steps=ns, sway=sw, num_step=nms)
             try:
                 if engine_type in ("medium", "high"):
                     async with gpu_lock:
@@ -729,28 +741,53 @@ async def _run_generation(task_id: str):
             await task_manager.set_chunk_audio(task_id, 0, f"/tts/download_file?path={task_id}/chunk_0.wav", duration=chunk_dur)
             await task_manager.update(task_id, status="chunks_done", progress=85, stage="chunks_done")
         else:
-            # Piper: per-sentence chunking
+            # Per-sentence chunking
             t_synth = time.time()
-            for i in range(len(orig_texts)):
-                await task_manager.update_chunk(task_id, i, status="processing")
-                await task_manager.recalc_progress(task_id)
-                chunk_gen_text = gen_texts[i]
+            if engine_type == "low":
+                # Piper: parallel synthesis (CPU threads)
+                from functools import partial
+                def _synth_one(i):
+                    chunk_gen_text = gen_texts[i]
+                    lb_pause = pause_cfg.get("pauses", {}).get("linebreak", 0)
+                    seg = synthesize_with_pauses(piper_engine, f5_engine, omnivoice_engine,
+                        chunk_gen_text, engine_type, voice_id, pause_cfg,
+                        speed=spd, pitch=pit, volume=vol, normalize_audio=norm_audio,
+                        cfg_strength=cfg_val, steps=steps_val, sway=sway_val, num_step=num_step_val)
+                    if i > 0 and chunks_data[i].get("new_paragraph") and lb_pause > 0:
+                        seg = AudioSegment.silent(duration=int(lb_pause * 1000)) + seg
+                    chunk_filename = f"chunk_{i}.wav"
+                    chunk_path = task_dir(task_id) / chunk_filename
+                    seg.export(str(chunk_path), format="wav")
+                    return i, chunk_filename, round(len(seg) / 1000, 3)
 
-                def _do_synth(t=chunk_gen_text, et=engine_type, vid=voice_id, pc=pause_cfg, s=spd, p=pit, v=vol, na=norm_audio):
-                    return synthesize_with_pauses(piper_engine, f5_engine, omnivoice_engine, t, et, vid, pc, speed=s, pitch=p, volume=v, normalize_audio=na)
+                tasks = [loop.run_in_executor(None, _synth_one, i) for i in range(len(orig_texts))]
+                for coro in asyncio.as_completed(tasks):
+                    i, chunk_filename, chunk_dur = await coro
+                    await task_manager.update_chunk(task_id, i, status="processing")
+                    await task_manager.set_chunk_audio(task_id, i,
+                        f"/tts/download_file?path={task_id}/{chunk_filename}", duration=chunk_dur)
+                    await task_manager.recalc_progress(task_id)
+            else:
+                for i in range(len(orig_texts)):
+                    await task_manager.update_chunk(task_id, i, status="processing")
+                    await task_manager.recalc_progress(task_id)
+                    chunk_gen_text = gen_texts[i]
 
-                seg = await loop.run_in_executor(None, _do_synth)
+                    def _do_synth(t=chunk_gen_text, et=engine_type, vid=voice_id, pc=pause_cfg, s=spd, p=pit, v=vol, na=norm_audio, cf=cfg_val, ns=steps_val, sw=sway_val, nms=num_step_val):
+                        return synthesize_with_pauses(piper_engine, f5_engine, omnivoice_engine, t, et, vid, pc, speed=s, pitch=p, volume=v, normalize_audio=na, cfg_strength=cf, steps=ns, sway=sw, num_step=nms)
 
-                lb_pause = pause_cfg.get("pauses", {}).get("linebreak", 0)
-                if i > 0 and chunks_data[i].get("new_paragraph") and lb_pause > 0:
-                    seg = AudioSegment.silent(duration=int(lb_pause * 1000)) + seg
+                    seg = await loop.run_in_executor(None, _do_synth)
 
-                chunk_filename = f"chunk_{i}.wav"
-                chunk_path = task_dir(task_id) / chunk_filename
-                seg.export(str(chunk_path), format="wav")
-                chunk_dur = round(len(seg) / 1000, 3)
-                await task_manager.set_chunk_audio(task_id, i, f"/tts/download_file?path={task_id}/{chunk_filename}", duration=chunk_dur)
-                await task_manager.recalc_progress(task_id)
+                    lb_pause = pause_cfg.get("pauses", {}).get("linebreak", 0)
+                    if i > 0 and chunks_data[i].get("new_paragraph") and lb_pause > 0:
+                        seg = AudioSegment.silent(duration=int(lb_pause * 1000)) + seg
+
+                    chunk_filename = f"chunk_{i}.wav"
+                    chunk_path = task_dir(task_id) / chunk_filename
+                    seg.export(str(chunk_path), format="wav")
+                    chunk_dur = round(len(seg) / 1000, 3)
+                    await task_manager.set_chunk_audio(task_id, i, f"/tts/download_file?path={task_id}/{chunk_filename}", duration=chunk_dur)
+                    await task_manager.recalc_progress(task_id)
 
             print(f"[TTS] split synth total={time.time()-t_synth:.2f}s engine={engine_type} chunks={len(orig_texts)} chars={len(text)}")
             await task_manager.update(task_id, status="chunks_done", progress=85, stage="chunks_done")
@@ -825,9 +862,13 @@ async def regenerate_chunk(req: ChunkRegenRequest):
         pit = task.get("pitch", 0.0)
         vol = task.get("volume", 0.0)
         na = task.get("normalize_audio", True)
+        cf = task.get("cfg_strength", 2.0)
+        ns = task.get("steps", 32)
+        sw = task.get("sway", -1.0)
+        nms = task.get("num_step", 8)
         loop = asyncio.get_running_loop()
-        def _do(et=engine_type, t=chunk_gen_text, vid=voice_id, pc=pause_cfg, s=spd, p=pit, v=vol, n_audio=na):
-            return synthesize_with_pauses(piper_engine, f5_engine, omnivoice_engine, t, et, vid, pc, speed=s, pitch=p, volume=v, normalize_audio=n_audio)
+        def _do(et=engine_type, t=chunk_gen_text, vid=voice_id, pc=pause_cfg, s=spd, p=pit, v=vol, n_audio=na, cfgv=cf, nsv=ns, swv=sw, nmsv=nms):
+            return synthesize_with_pauses(piper_engine, f5_engine, omnivoice_engine, t, et, vid, pc, speed=s, pitch=p, volume=v, normalize_audio=n_audio, cfg_strength=cfgv, steps=nsv, sway=swv, num_step=nmsv)
         if engine_type in ("medium", "high"):
             async with gpu_lock:
                 seg = await loop.run_in_executor(None, _do)

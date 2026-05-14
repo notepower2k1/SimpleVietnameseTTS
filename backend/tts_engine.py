@@ -349,7 +349,7 @@ class F5Engine:
             return txt_file.read_text(encoding="utf-8").strip()
         return ""
 
-    def synthesize(self, text: str, voice_id: str, speed: float = 1.0) -> AudioSegment:
+    def synthesize(self, text: str, voice_id: str, speed: float = 1.0, cfg: float = 2.0, nfe: int = 32, sway: float = -1.0) -> AudioSegment:
         if not self._loaded:
             self.load()
         audio_file = self._find_audio(voice_id)
@@ -398,9 +398,9 @@ class F5Engine:
                     cond=audio_cond,
                     text=final_text_list,
                     duration=duration,
-                    steps=32,
-                    cfg_strength=2.0,
-                    sway_sampling_coef=-1.0,
+                    steps=nfe,
+                    cfg_strength=cfg,
+                    sway_sampling_coef=sway,
                 )
                 generated = generated.to(torch.float32)
                 generated = generated[:, ref_audio_len:, :]
@@ -609,18 +609,21 @@ class OmniVoiceEngine:
         self._voice_prompts[voice_id] = prompt
         return prompt
 
-    def synthesize(self, text: str, voice_id: str, speed: float = 1.0) -> AudioSegment:
+    def synthesize(self, text: str, voice_id: str, speed: float = 1.0, cfg: float = 2.0, num_step: int = 8) -> AudioSegment:
         if not self._loaded:
             self.load()
 
         prompt = self._get_voice_prompt(voice_id)
 
-        # OmniVoice doesn't support speed directly, but we can adjust via guidance
+        import copy
+        gen_cfg = copy.copy(self.config)
+        gen_cfg.guidance_scale = cfg
+        gen_cfg.num_step = num_step
         audio = self.model.generate(
             text=text,
             language="vietnamese",
             voice_clone_prompt=prompt,
-            generation_config=self.config,
+            generation_config=gen_cfg,
         )
 
         # audio is numpy array [channels, samples] or [samples]
@@ -682,7 +685,7 @@ class TaskManager:
         self._tasks: dict[str, dict] = {}
         self._lock = asyncio.Lock()
 
-    async def create(self, text: str, voice_mode: str, voice_id: str, output_format: str = "mp3", normalize: bool = False, clean: bool = False, normalize_audio: bool = True, speed: float = 1.0, pitch: float = 0.0, volume: float = 0.0, split_segments: bool = False) -> str:
+    async def create(self, text: str, voice_mode: str, voice_id: str, output_format: str = "mp3", normalize: bool = False, clean: bool = False, normalize_audio: bool = True, speed: float = 1.0, pitch: float = 0.0, volume: float = 0.0, split_segments: bool = False, cfg_strength: float = 2.0, steps: int = 32, sway: float = -1.0, num_step: int = 8) -> str:
         task_id = uuid.uuid4().hex[:12]
         engine_type = voice_mode if voice_mode in ("preset", "custom") else "preset"
         raw_chunks = chunk_text_sentences(text)
@@ -710,6 +713,10 @@ class TaskManager:
                 "pitch": pitch,
                 "volume": volume,
                 "split_segments": split_segments,
+                "cfg_strength": cfg_strength,
+                "steps": steps,
+                "sway": sway,
+                "num_step": num_step,
                 "chunks": chunks,
                 "status": "pending",
                 "progress": 0,

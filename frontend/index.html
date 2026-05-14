@@ -46,7 +46,7 @@
     line-height: 1.5;
   }
 
-  .container { width: 100%; max-width: 1400px; display: flex; flex-direction: column; min-height: 100vh; }
+  .container { width: 90%; display: flex; flex-direction: column; min-height: 100vh; }
 
   .header {
     display: flex;
@@ -1602,15 +1602,15 @@
         </div>
         <div class="checkbox-group">
           <label class="checkbox-label">
-            <input type="checkbox" id="normalizeCheckbox" checked>
+            <input type="checkbox" id="normalizeCheckbox">
             <span>Vietnamese normalize</span>
           </label>
           <label class="checkbox-label">
-            <input type="checkbox" id="cleanCheckbox" checked>
+            <input type="checkbox" id="cleanCheckbox">
             <span>Auto clean text</span>
           </label>
           <label class="checkbox-label">
-            <input type="checkbox" id="normalizeAudioCheckbox" checked>
+            <input type="checkbox" id="normalizeAudioCheckbox">
             <span>Normalize volume</span>
           </label>
           <label class="checkbox-label" id="splitSegmentsLabel" style="border-top:1px solid var(--card-border);padding-top:10px;margin-top:4px;">
@@ -1663,6 +1663,29 @@
             <input type="range" id="volumeSlider" min="-10" max="10" step="1" value="0">
             <span class="slider-value" id="volumeVal">0 dB</span>
           </div>
+          <div id="modelConfig" class="hidden" style="margin-top:10px;padding-top:10px;border-top:1px solid var(--card-border);">
+            <div style="font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase;margin-bottom:8px;">Model Config — Medium (F5)</div>
+            <div class="slider-row" id="cfgRow" title="Higher = voice matches reference more closely. Lower = more variation.">
+              <span class="slider-label">Voice Match</span>
+              <input type="range" id="cfgSlider" min="1" max="4" step="0.1" value="2">
+              <span class="slider-value" id="cfgVal">2.0</span>
+            </div>
+            <div class="slider-row" id="stepsRow" title="More steps = better quality but slower. 32 is a good balance.">
+              <span class="slider-label">Quality</span>
+              <input type="range" id="stepsSlider" min="16" max="64" step="16" value="32">
+              <span class="slider-value" id="stepsVal">32</span>
+            </div>
+            <div class="slider-row" id="swayRow" title="Controls speech rhythm. -1.0 is default.">
+              <span class="slider-label">Rhythm</span>
+              <input type="range" id="swaySlider" min="-1" max="1" step="0.1" value="-1">
+              <span class="slider-value" id="swayVal">-1.0</span>
+            </div>
+            <div class="slider-row" id="numStepRow" title="More steps = better quality but slower. 8 is a good balance.">
+              <span class="slider-label">Quality</span>
+              <input type="range" id="numStepSlider" min="4" max="32" step="4" value="8">
+              <span class="slider-value" id="numStepVal">8</span>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -1676,6 +1699,7 @@
       <div class="card hidden" id="outputCard">
         <div class="output-section">
           <audio id="audioPlayer" controls></audio>
+          <canvas id="waveformCanvas" style="width:100%;height:80px;border-radius:var(--radius-sm);background:var(--bg-secondary);margin-top:8px;display:none;"></canvas>
           <div class="output-actions">
             <select id="formatSelect">
               <option value="mp3">MP3</option>
@@ -2009,6 +2033,23 @@ function toggleAdv(el) {
   updateSliderFill();
 });
 
+// Model config sliders (F5 / OmniVoice)
+['cfgSlider','stepsSlider','swaySlider','numStepSlider'].forEach(id => {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const valEl = document.getElementById(id.replace('Slider','Val'));
+  if (!valEl) return;
+  el.addEventListener('input', function() {
+    valEl.textContent = id === 'cfgSlider' || id === 'swaySlider' ? parseFloat(this.value).toFixed(1) : this.value;
+    const min = parseFloat(el.min); const max = parseFloat(el.max);
+    const pct = ((parseFloat(el.value) - min) / (max - min)) * 100;
+    el.style.background = `linear-gradient(to right, var(--accent-primary) 0%, var(--accent-primary) ${pct}%, var(--card-border) ${pct}%, var(--card-border) 100%)`;
+  });
+  const min = parseFloat(el.min); const max = parseFloat(el.max);
+  const pct = ((parseFloat(el.value) - min) / (max - min)) * 100;
+  el.style.background = `linear-gradient(to right, var(--accent-primary) 0%, var(--accent-primary) ${pct}%, var(--card-border) ${pct}%, var(--card-border) 100%)`;
+});
+
 progressCard.classList.add('hidden');
 outputCard.classList.add('hidden');
 
@@ -2065,6 +2106,7 @@ voiceModeToggle.addEventListener('click', e => {
   CURRENT_VOICE_MODE = btn.dataset.mode;
   document.getElementById('newVoiceBtn').style.display = (CURRENT_VOICE_MODE === 'medium' || CURRENT_VOICE_MODE === 'high') ? 'inline-block' : 'none';
   updateSplitCheckbox();
+  updateModelConfig();
   const list = ALL_VOICES[CURRENT_VOICE_MODE] || [];
   if (list.length > 0 && !list.find(v => v.id === CURRENT_VOICE_ID)) {
     selectVoice(list[0].id, list[0].label, list[0].gender || '');
@@ -2127,6 +2169,7 @@ function selectVoice(id, label, gender) {
   CURRENT_VOICE_ID = id;
   updateVoiceLabel();
   updateSplitCheckbox();
+  updateModelConfig();
 }
 
 function anyVoiceExists() {
@@ -2153,6 +2196,33 @@ function updateSplitCheckbox() {
   const cb = document.getElementById('splitSegmentsCheckbox');
   label.style.display = '';
   cb.disabled = false;
+}
+
+function updateModelConfig() {
+  const panel = document.getElementById('modelConfig');
+  if (!panel) return;
+  const cfgRow = document.getElementById('cfgRow');
+  const stepsRow = document.getElementById('stepsRow');
+  const swayRow = document.getElementById('swayRow');
+  const numStepRow = document.getElementById('numStepRow');
+  const title = panel.querySelector('div');
+  if (CURRENT_VOICE_MODE === 'low') {
+    panel.classList.add('hidden');
+  } else {
+    panel.classList.remove('hidden');
+    if (cfgRow) cfgRow.style.display = '';
+    if (CURRENT_VOICE_MODE === 'medium') {
+      if (title) title.textContent = 'Model Config \u2014 Medium (F5)';
+      if (stepsRow) stepsRow.style.display = '';
+      if (swayRow) swayRow.style.display = '';
+      if (numStepRow) numStepRow.style.display = 'none';
+    } else {
+      if (title) title.textContent = 'Model Config \u2014 High (OmniVoice)';
+      if (stepsRow) stepsRow.style.display = 'none';
+      if (swayRow) swayRow.style.display = 'none';
+      if (numStepRow) numStepRow.style.display = '';
+    }
+  }
 }
 
 function getCurrentVoiceLabel() {
@@ -2204,6 +2274,7 @@ function selectVoiceFromCard(mode, id) {
     CURRENT_VOICE_ID = id;
     updateVoiceLabel();
     updateSplitCheckbox();
+    updateModelConfig();
     document.querySelectorAll('#voiceModeToggle .toggle-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
     document.getElementById('newVoiceBtn').style.display = (mode === 'medium' || mode === 'high') ? 'inline-block' : 'none';
     updateCharCount();
@@ -2289,11 +2360,11 @@ previewBtn.addEventListener('click', async () => {
     const res = await fetch(`${API_BASE}/tts/preview`, {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({text, voice_mode: CURRENT_VOICE_MODE, voice_id: CURRENT_VOICE_ID, normalize, clean: document.getElementById('cleanCheckbox').checked, normalize_audio: document.getElementById('normalizeAudioCheckbox').checked, speed: parseFloat(document.getElementById('speedSlider').value), pitch: parseFloat(document.getElementById('pitchSlider').value), volume: parseFloat(document.getElementById('volumeSlider').value)}),
+      body: JSON.stringify({text, voice_mode: CURRENT_VOICE_MODE, voice_id: CURRENT_VOICE_ID, normalize, clean: document.getElementById('cleanCheckbox').checked, normalize_audio: document.getElementById('normalizeAudioCheckbox').checked, speed: parseFloat(document.getElementById('speedSlider').value), pitch: parseFloat(document.getElementById('pitchSlider').value), volume: parseFloat(document.getElementById('volumeSlider').value), cfg_strength: parseFloat(document.getElementById('cfgSlider').value), steps: parseInt(document.getElementById('stepsSlider').value), sway: parseFloat(document.getElementById('swaySlider').value), num_step: parseInt(document.getElementById('numStepSlider').value)}),
     });
     if (!res.ok) throw new Error('Preview failed');
     const data = await res.json();
-    audioPlayer.src = `${API_BASE}${data.audio_url}`;
+    loadAudio(`${API_BASE}${data.audio_url}`);
     audioPlayer.play().catch(() => {});
   } catch (e) { showError('Preview: ' + e.message); }
   previewBtn.disabled = false; previewBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor" style="width:16px;height:16px;"><polygon points="5 3 19 12 5 21 5 3"/></svg> Preview';
@@ -2320,7 +2391,7 @@ async function startGeneration() {
     const res = await fetch(`${API_BASE}/tts/generate`, {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({text, voice_mode: CURRENT_VOICE_MODE, voice_id: CURRENT_VOICE_ID, output_format: 'mp3', normalize, clean: document.getElementById('cleanCheckbox').checked, normalize_audio: document.getElementById('normalizeAudioCheckbox').checked, speed: parseFloat(document.getElementById('speedSlider').value), pitch: parseFloat(document.getElementById('pitchSlider').value), volume: parseFloat(document.getElementById('volumeSlider').value), split_segments: document.getElementById('splitSegmentsCheckbox').checked}),
+      body: JSON.stringify({text, voice_mode: CURRENT_VOICE_MODE, voice_id: CURRENT_VOICE_ID, output_format: 'mp3', normalize, clean: document.getElementById('cleanCheckbox').checked, normalize_audio: document.getElementById('normalizeAudioCheckbox').checked, speed: parseFloat(document.getElementById('speedSlider').value), pitch: parseFloat(document.getElementById('pitchSlider').value), volume: parseFloat(document.getElementById('volumeSlider').value), split_segments: document.getElementById('splitSegmentsCheckbox').checked, cfg_strength: parseFloat(document.getElementById('cfgSlider').value), steps: parseInt(document.getElementById('stepsSlider').value), sway: parseFloat(document.getElementById('swaySlider').value), num_step: parseInt(document.getElementById('numStepSlider').value)}),
     });
     if (!res.ok) throw new Error('Generation failed');
     const data = await res.json();
@@ -2347,7 +2418,7 @@ function pollStatus(taskId) {
         progressCard.classList.add('hidden');
         outputCard.classList.remove('hidden');
         CURRENT_AUDIO_URL = `${API_BASE}${data.audio_url}`;
-        audioPlayer.src = CURRENT_AUDIO_URL; audioPlayer.load();
+        loadAudio(CURRENT_AUDIO_URL);
         generateBtn.disabled = false; resetBtn.style.display = 'inline-flex'; STATE = 'done';
       } else if (data.status === 'error') {
         clearInterval(POLL_INTERVAL); POLL_INTERVAL = null;
@@ -2383,13 +2454,58 @@ async function doMerge() {
     const data = await res.json();
     outputCard.classList.remove('hidden');
     CURRENT_AUDIO_URL = `${API_BASE}${data.audio_url}`;
-    audioPlayer.src = CURRENT_AUDIO_URL; audioPlayer.load();
+    loadAudio(CURRENT_AUDIO_URL);
   } catch (e) { showError('Auto-merge: ' + e.message); }
 }
 
 function setProgress(pct, label) {
   progressFill.style.width = Math.min(pct, 100) + '%';
   progressLabel.textContent = label ? label.replace(/_/g, ' ') + ` ${Math.round(pct)}%` : `${Math.round(pct)}%`;
+}
+
+function drawWaveform(audioUrl) {
+  const canvas = document.getElementById('waveformCanvas');
+  if (!canvas) return;
+  canvas.style.display = 'block';
+  const ctx = canvas.getContext('2d');
+  const w = 600;
+  const h = 160;
+  canvas.width = w;
+  canvas.height = h;
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = '#2a2a2a';
+  ctx.fillRect(0, 0, w, h);
+  
+  fetch(audioUrl).then(r => r.arrayBuffer()).then(buf => {
+    const actx = new (window.AudioContext || window.webkitAudioContext)();
+    return actx.decodeAudioData(buf);
+  }).then(audioBuffer => {
+    const data = audioBuffer.getChannelData(0);
+    const step = Math.max(1, Math.floor(data.length / w));
+    ctx.fillStyle = '#5b7a6a';
+    for (let i = 0; i < w; i++) {
+      let peak = 0;
+      const start = i * step;
+      const end = Math.min(start + step, data.length);
+      for (let j = start; j < end; j++) {
+        const v = Math.abs(data[j]);
+        if (v > peak) peak = v;
+      }
+      const barH = peak * h * 0.8;
+      ctx.fillRect(i, (h - barH) / 2, 2, Math.max(1, barH));
+    }
+  }).catch(e => {
+    ctx.fillStyle = '#666';
+    ctx.font = '12px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Waveform unavailable', w/2, h/2);
+  });
+}
+
+function loadAudio(url) {
+  audioPlayer.src = url;
+  audioPlayer.load();
+  drawWaveform(url);
 }
 
 function onError(msg) {
@@ -3182,7 +3298,7 @@ document.getElementById('helpModal').addEventListener('click', e => {
   if (e.target === e.currentTarget) document.getElementById('helpModal').classList.add('hidden');
 });
 
-updateCharCount(); updateSplitCheckbox(); loadVoices();
+updateCharCount(); updateSplitCheckbox(); updateModelConfig(); loadVoices();
 fetch(`${API_BASE}/tts/pause_config`).then(r => r.json()).then(c => { PAUSE_CFG = c; updateCharCount(); }).catch(() => {});
 </script>
 </body>
