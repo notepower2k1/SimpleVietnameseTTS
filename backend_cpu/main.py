@@ -841,13 +841,8 @@ if getattr(sys, 'frozen', False):
 else:
     BASE_DIR = Path(__file__).resolve().parent.parent
 FRONTEND_DIR = BASE_DIR / "frontend"
-FONTS_DIR = FRONTEND_DIR / "fonts"
 
-app.mount("/fonts", StaticFiles(directory=str(FONTS_DIR)), name="fonts")
-
-@app.get("/")
-async def root():
-    return FileResponse(str(FRONTEND_DIR / "index.html"))
+app.mount("/", StaticFiles(directory=str(FRONTEND_DIR), html=True), name="frontend")
 
 
 if __name__ == "__main__":

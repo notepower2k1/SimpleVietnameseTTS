@@ -4,7 +4,7 @@
 
 A self-hosted Vietnamese Text-to-Speech tool that runs entirely on your machine. No subscriptions, no usage quotas, no data sent to external servers. Your text and audio never leave your computer.
 
-![CapCap TTS UI](./screenshot.jpg)
+![CapCap TTS UI](./screenshot.png)
 
 ## Why Local & Free?
 
