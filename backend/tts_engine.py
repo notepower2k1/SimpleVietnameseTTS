@@ -317,11 +317,13 @@ class F5Engine:
                 seen.add(vid)
                 m = meta.get(vid, {})
                 label = m.get("name", vid.replace("_", " ").title())
+                is_clone = m.get("clone", False) or (self._voices_dir / f"{vid}.txt").exists()
                 v = {
                     "id": vid, "label": label, "engine": "f5",
                     "gender": m.get("gender", ""),
                     "description": m.get("description", ""),
                     "ref_text": (m.get("text_ref", "") or "")[:100],
+                    "is_clone": is_clone,
                 }
                 if include_rate:
                     from f5_tts.infer.utils_infer import hop_length, target_sample_rate
@@ -490,15 +492,40 @@ class F5Engine:
         self._audio_cache[voice_id] = cache
         return cache
 
-    def clone_voice(self, ref_audio_path: str, ref_text: str, voice_id: str):
+    def clone_voice(self, ref_audio_path: str, ref_text: str, voice_id: str, gender: str = "male", description: str = "No description", raw_name: str = None):
         processed_audio, processed_text = preprocess_ref_audio_text(ref_audio_path, ref_text)
         target_audio = self._voices_dir / f"{voice_id}.wav"
         shutil.copy(processed_audio, target_audio)
-        target_text = self._voices_dir / f"{voice_id}.txt"
-        with open(target_text, "w", encoding="utf-8") as f:
-            f.write(processed_text)
         self._audio_cache.pop(voice_id, None)
+        self._update_voices_json(voice_id, processed_text, gender, description, raw_name or voice_id)
         return voice_id
+
+    def _update_voices_json(self, voice_id: str, ref_text: str, gender: str = "male", description: str = "No description", display_name: str = None):
+        meta_file = self._voices_dir / "voices.json"
+        entries = []
+        if meta_file.exists():
+            try:
+                entries = json.loads(meta_file.read_text(encoding="utf-8"))
+            except Exception:
+                pass
+        for e in entries:
+            if Path(e.get("audio_path", "")).stem == voice_id:
+                e["text_ref"] = ref_text
+                e["gender"] = gender
+                e["description"] = description
+                if display_name:
+                    e["name"] = display_name
+                meta_file.write_text(json.dumps(entries, ensure_ascii=False, indent=2), encoding="utf-8")
+                return
+        entries.append({
+            "name": display_name or voice_id.replace("_", " ").title(),
+            "gender": gender,
+            "audio_path": f"{voice_id}.wav",
+            "description": description,
+            "text_ref": ref_text,
+            "clone": True,
+        })
+        meta_file.write_text(json.dumps(entries, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 class OmniVoiceEngine:
@@ -565,11 +592,13 @@ class OmniVoiceEngine:
                 seen.add(vid)
                 m = meta.get(vid, {})
                 label = m.get("name", vid.replace("_", " ").title())
+                is_clone = m.get("clone", False) or (self._voices_dir / f"{vid}.txt").exists()
                 v = {
                     "id": vid, "label": label, "engine": "omnivoice",
                     "gender": m.get("gender", ""),
                     "description": m.get("description", ""),
                     "ref_text": (m.get("text_ref", "") or "")[:100],
+                    "is_clone": is_clone,
                 }
                 if include_rate:
                     v["rate"] = 8  # OmniVoice is slower
@@ -642,20 +671,17 @@ class OmniVoiceEngine:
         buf.seek(0)
         return AudioSegment.from_wav(buf)
 
-    def clone_voice(self, ref_audio_path: str, ref_text: str, voice_id: str):
+    def clone_voice(self, ref_audio_path: str, ref_text: str, voice_id: str, gender: str = "male", description: str = "No description", raw_name: str = None):
         """Save reference audio and text for OmniVoice voice cloning."""
         target_audio = self._voices_dir / f"{voice_id}.wav"
         shutil.copy(ref_audio_path, target_audio)
-        target_text = self._voices_dir / f"{voice_id}.txt"
-        with open(target_text, "w", encoding="utf-8") as f:
-            f.write(ref_text.strip())
         # Also update voices.json
-        self._update_voices_json(voice_id, ref_text)
+        self._update_voices_json(voice_id, ref_text, gender, description, raw_name or voice_id)
         # Clear cached prompt so it reloads
         self._voice_prompts.pop(voice_id, None)
         return voice_id
 
-    def _update_voices_json(self, voice_id: str, ref_text: str):
+    def _update_voices_json(self, voice_id: str, ref_text: str, gender: str = "male", description: str = "No description", display_name: str = None):
         meta_file = self._voices_dir / "voices.json"
         entries = []
         if meta_file.exists():
@@ -667,15 +693,20 @@ class OmniVoiceEngine:
         for e in entries:
             if Path(e.get("audio_path", "")).stem == voice_id:
                 e["text_ref"] = ref_text
+                e["gender"] = gender
+                e["description"] = description
+                if display_name:
+                    e["name"] = display_name
                 meta_file.write_text(json.dumps(entries, ensure_ascii=False, indent=2), encoding="utf-8")
                 return
         # Add new entry
         entries.append({
-            "name": voice_id.replace("_", " ").title(),
-            "gender": "",
+            "name": display_name or voice_id.replace("_", " ").title(),
+            "gender": gender,
             "audio_path": f"{voice_id}.wav",
-            "description": "Custom cloned voice",
+            "description": description,
             "text_ref": ref_text,
+            "clone": True,
         })
         meta_file.write_text(json.dumps(entries, ensure_ascii=False, indent=2), encoding="utf-8")
 
@@ -749,6 +780,28 @@ class TaskManager:
                 task["chunks"][chunk_index]["audio_path"] = audio_path
                 task["chunks"][chunk_index]["duration"] = duration
                 task["chunks"][chunk_index]["status"] = "done"
+
+    async def set_chunk_audio_with_quality(self, task_id: str, chunk_index: int, audio_path: str, duration: float, quality: dict):
+        async with self._lock:
+            task = self._tasks.get(task_id)
+            if task and chunk_index < len(task["chunks"]):
+                chunk = task["chunks"][chunk_index]
+                chunk["audio_path"] = audio_path
+                chunk["duration"] = duration
+                chunk["issues"] = quality["issues"]
+                chunk["quality_metrics"] = quality["metrics"]
+                chunk["can_export"] = quality["can_export"]
+                chunk["should_recommend_retry"] = quality["should_recommend_retry"]
+                if quality["status"] == "failed":
+                    chunk["status"] = "error"
+                    chunk["error"] = quality["issues"][0]["message"] if quality["issues"] else "Quality check failed"
+                    chunk["warning"] = False
+                elif quality["status"] == "warning":
+                    chunk["status"] = "done"
+                    chunk["warning"] = True
+                else:
+                    chunk["status"] = "done"
+                    chunk["warning"] = False
 
     async def set_chunk_error(self, task_id: str, chunk_index: int, error: str):
         async with self._lock:

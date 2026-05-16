@@ -25,10 +25,42 @@ A self-hosted Vietnamese Text-to-Speech tool that runs entirely on your machine.
   - **High (OmniVoice)** — Best quality, HuggingFace model, GPU required
 - **Shared voice library** — F5 and OmniVoice share the same reference audio & text
 - **Chunk-based generation** — Long text split into segments, generated sequentially with progress tracking
+- **Segment quality check** — Auto-detects incomplete speech, low volume, excessive silence, clipping — marks segments as warning/failed
+- **Segment download** — Download individual audio segments (WAV) with one click
 - **Custom dictionary** — Override pronunciation for acronyms and non-Vietnamese words
 - **Pause control** — Adjustable silence after punctuation + custom `[Xs]` markers
 - **History** — Auto-saved generation history with playback
 - **Vietnamese normalization** — Built-in text normalization via `vietnormalizer`
+
+## Segment Quality Check
+
+After each audio segment is generated, CapCap automatically evaluates its quality and classifies it:
+
+| Status | Meaning | Can Export | Icon |
+|--------|---------|-----------|------|
+| **done** | Audio is usable, no quality issues | ✅ | Green checkmark |
+| **warning** | Playable but has issues (short duration, low volume, clipping, excessive silence) | ✅ | Yellow warning triangle |
+| **failed** | Audio corrupted, silent, or too short for the input text | ❌ | Red error icon |
+
+**What triggers a warning:**
+- Duration too short/long vs. expected (based on text length)
+- Silence ratio ≥ 45% 
+- Leading silence ≥ 1s or trailing silence ≥ 1.5s
+- RMS < -35dB or peak < -18dB (low volume)
+- Clipping ratio ≥ 0.1%
+- Text > 500 characters per segment
+
+**What triggers a failed status:**
+- Generation error
+- Missing or empty audio file
+- Corrupted audio (decode failure)
+- Zero duration
+- Silence ratio ≥ 98% (full silence)
+- Text ≥ 30 chars but audio < 0.5s
+
+Failed segments block the Merge & Download action. Warning segments can still be exported.
+
+You can click **Download** on any individual segment (always WAV format, lossless).
 
 ## Hardware Recommendation
 
@@ -182,6 +214,7 @@ Others on your Wi-Fi can then access via `http://<your-ip>:8000`
 TTS/
 ├── backend/              # GPU version (Piper + F5-TTS)
 │   ├── main.py           # FastAPI endpoints
+│   ├── tts_quality_checker.py  # Segment quality evaluation
 │   ├── tts_engine.py     # PiperEngine, F5Engine, TaskManager
 │   ├── config.py         # Path configuration
 │   ├── requirements.txt  # Dependencies
@@ -190,6 +223,7 @@ TTS/
 │   └── f5_tts/           # Local F5-TTS copy
 ├── backend_cpu/          # CPU-only version (Piper only)
 │   ├── main.py
+│   ├── tts_quality_checker.py
 │   ├── tts_engine.py
 │   ├── config.py
 │   ├── requirements.txt
@@ -209,8 +243,9 @@ TTS/
 | `GET` | `/tts/voices` | List available voices |
 | `POST` | `/tts/preview` | Generate short preview |
 | `POST` | `/tts/generate` | Start full generation |
-| `GET` | `/tts/status/{task_id}` | Check generation progress |
-| `POST` | `/tts/merge` | Merge chunks into final audio |
+| `GET` | `/tts/status/{task_id}` | Check generation progress — returns `warning`, `issues[]`, `can_export` per segment |
+| `POST` | `/tts/merge` | Merge chunks into final audio (blocked if any chunk `can_export=false`) |
+| `POST` | `/tts/regenerate_chunk` | Regenerate a single segment |
 | `GET` | `/tts/download_file` | Download audio/SRT |
 | `POST` | `/tts/clone` | Clone a new voice (GPU only) |
 | `GET/POST/DELETE` | `/tts/dict/acronyms` | Manage acronym dictionary |

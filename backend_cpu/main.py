@@ -22,6 +22,7 @@ import aiofiles
 from huggingface_hub import HfApi
 
 from config import OUTPUT_DIR, PIPER_DIR, MAX_TEXT_LENGTH
+from tts_quality_checker import evaluate_segment_quality
 from tts_engine import (
     PiperEngine, TaskManager,
     chunk_text_sentences, merge_audio_segments,
@@ -178,6 +179,7 @@ class ChunkRegenRequest(BaseModel):
     task_id: str
     chunk_index: int
     text: str | None = None
+    voice_id: str | None = None
 
 
 class MergeRequest(BaseModel):
@@ -296,12 +298,15 @@ async def _run_generation(task_id: str):
         if do_normalize:
             gen_texts = [normalize_with_pause_protection(c) for c in orig_texts]
 
+        voice_id = task["voice_id"]
+
         chunks_data = []
         for i in range(len(orig_texts)):
             chunks_data.append({
                 "index": i, "text": orig_texts[i], "gen_text": gen_texts[i],
                 "new_paragraph": is_new_para[i] if i < len(is_new_para) else False,
                 "status": "pending", "audio_path": None, "error": None,
+                "voice_id": voice_id,
             })
         await task_manager.set_chunks(task_id, chunks_data)
 
@@ -329,7 +334,8 @@ async def _run_generation(task_id: str):
             chunk_path = task_dir(task_id) / chunk_filename
             seg.export(str(chunk_path), format="wav")
             chunk_dur = round(len(seg) / 1000, 3)
-            await task_manager.set_chunk_audio(task_id, i, f"/tts/download_file?path={task_id}/{chunk_filename}", duration=chunk_dur)
+            quality = await loop.run_in_executor(None, evaluate_segment_quality, orig_texts[i], str(chunk_path))
+            await task_manager.set_chunk_audio_with_quality(task_id, i, f"/tts/download_file?path={task_id}/{chunk_filename}", duration=chunk_dur, quality=quality)
             await task_manager.recalc_progress(task_id)
 
         await task_manager.update(task_id, status="chunks_done", progress=85, stage="chunks_done")
@@ -359,6 +365,11 @@ async def get_status(task_id: str):
                 "gen_text": c.get("gen_text", c["text"]),
                 "status": c["status"], "audio_url": c["audio_path"],
                 "duration": c.get("duration", 0), "error": c.get("error"),
+                "warning": c.get("warning", False),
+                "issues": c.get("issues", []),
+                "can_export": c.get("can_export", True),
+                "should_recommend_retry": c.get("should_recommend_retry", False),
+                "voice_id": c.get("voice_id", task.get("voice_id")),
             }
             for c in task.get("chunks", [])
         ],
@@ -377,9 +388,9 @@ async def regenerate_chunk(req: ChunkRegenRequest):
     chunk_gen_text = chunk_text
     if task.get("normalize"):
         chunk_gen_text = normalize_with_pause_protection(chunk_text)
-    voice_id = task["voice_id"]
+    voice_id = req.voice_id or task["voice_id"]
 
-    await task_manager.update_chunk(req.task_id, req.chunk_index, status="processing", text=chunk_text, gen_text=chunk_gen_text)
+    await task_manager.update_chunk(req.task_id, req.chunk_index, status="processing", text=chunk_text, gen_text=chunk_gen_text, voice_id=voice_id)
 
     try:
         pause_cfg = _load_pause_config()
@@ -394,10 +405,12 @@ async def regenerate_chunk(req: ChunkRegenRequest):
         chunk_path = task_dir(req.task_id) / chunk_filename
         seg.export(str(chunk_path), format="wav")
         chunk_dur = round(len(seg) / 1000, 3)
-        await task_manager.set_chunk_audio(req.task_id, req.chunk_index, f"/tts/download_file?path={req.task_id}/{chunk_filename}", duration=chunk_dur)
+        quality = await loop.run_in_executor(None, evaluate_segment_quality, chunk_text, str(chunk_path))
+        await task_manager.set_chunk_audio_with_quality(req.task_id, req.chunk_index, f"/tts/download_file?path={req.task_id}/{chunk_filename}", duration=chunk_dur, quality=quality)
         await task_manager.recalc_progress(req.task_id)
 
-        return {"chunk_index": req.chunk_index, "status": "done", "audio_url": f"/tts/download_file?path={req.task_id}/{chunk_filename}"}
+        qs = quality["status"]
+        return {"chunk_index": req.chunk_index, "status": "done" if qs != "failed" else "error", "audio_url": f"/tts/download_file?path={req.task_id}/{chunk_filename}", "quality_status": qs, "issues": quality["issues"], "voice_id": voice_id}
     except Exception as e:
         await task_manager.set_chunk_error(req.task_id, req.chunk_index, str(e))
         raise HTTPException(500, str(e))
@@ -416,6 +429,8 @@ async def merge_chunks(req: MergeRequest):
     for c in chunks:
         if c["status"] != "done":
             raise HTTPException(400, f"Chunk {c['index']} is not done yet")
+        if not c.get("can_export", True):
+            raise HTTPException(400, f"Chunk {c['index']} failed quality check and cannot be exported")
 
     output_format = req.output_format or "mp3"
     loop = asyncio.get_running_loop()

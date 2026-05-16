@@ -17,7 +17,13 @@ import sys
 
 import json
 
-from config import OUTPUT_DIR, PIPER_DIR, F5_VOICES_DIR, F5_RESOURCE_DIR, OMNIVOICE_MODEL_DIR, MAX_TEXT_LENGTH
+from config import OUTPUT_DIR, PIPER_DIR, F5_VOICES_DIR, F5_RESOURCE_DIR, OMNIVOICE_MODEL_DIR, MAX_TEXT_LENGTH, FFMPEG_DIR
+
+AudioSegment.converter = str(FFMPEG_DIR / "ffmpeg.exe")
+AudioSegment.ffprobe = str(FFMPEG_DIR / "ffprobe.exe")
+os.environ["PATH"] = str(FFMPEG_DIR) + os.pathsep + os.environ.get("PATH", "")
+
+from tts_quality_checker import evaluate_segment_quality
 
 # ─── Resource Download ───
 
@@ -451,6 +457,7 @@ class ChunkRegenRequest(BaseModel):
     task_id: str
     chunk_index: int
     text: str | None = None
+    voice_id: str | None = None
 
 
 class MergeRequest(BaseModel):
@@ -691,6 +698,7 @@ async def _run_generation(task_id: str):
                     "index": i, "text": orig_texts[i], "gen_text": gen_texts[i],
                     "new_paragraph": is_new_para[i] if i < len(is_new_para) else False,
                     "status": "pending", "audio_path": None, "error": None,
+                    "voice_id": voice_id,
                 })
         else:
             # Non-split mode: one chunk, full text
@@ -698,6 +706,7 @@ async def _run_generation(task_id: str):
             chunks_data = [{
                 "index": 0, "text": text, "gen_text": gen_text,
                 "new_paragraph": False, "status": "pending", "audio_path": None, "error": None,
+                "voice_id": voice_id,
             }]
             orig_texts = [text]
             gen_texts = [gen_text]
@@ -738,7 +747,8 @@ async def _run_generation(task_id: str):
             seg.export(str(chunk_path), format="wav")
             chunk_dur = round(len(seg) / 1000, 3)
             print(f"[TTS] non-split synth total={time.time()-t_synth:.2f}s engine={engine_type} chars={len(text)} chunk_dur={chunk_dur}s")
-            await task_manager.set_chunk_audio(task_id, 0, f"/tts/download_file?path={task_id}/chunk_0.wav", duration=chunk_dur)
+            quality = await loop.run_in_executor(None, evaluate_segment_quality, text, str(chunk_path))
+            await task_manager.set_chunk_audio_with_quality(task_id, 0, f"/tts/download_file?path={task_id}/chunk_0.wav", duration=chunk_dur, quality=quality)
             await task_manager.update(task_id, status="chunks_done", progress=85, stage="chunks_done")
         else:
             # Per-sentence chunking
@@ -758,14 +768,16 @@ async def _run_generation(task_id: str):
                     chunk_filename = f"chunk_{i}.wav"
                     chunk_path = task_dir(task_id) / chunk_filename
                     seg.export(str(chunk_path), format="wav")
-                    return i, chunk_filename, round(len(seg) / 1000, 3)
+                    chunk_dur = round(len(seg) / 1000, 3)
+                    quality = evaluate_segment_quality(orig_texts[i], str(chunk_path))
+                    return i, chunk_filename, chunk_dur, quality
 
                 tasks = [loop.run_in_executor(None, _synth_one, i) for i in range(len(orig_texts))]
                 for coro in asyncio.as_completed(tasks):
-                    i, chunk_filename, chunk_dur = await coro
+                    i, chunk_filename, chunk_dur, quality = await coro
                     await task_manager.update_chunk(task_id, i, status="processing")
-                    await task_manager.set_chunk_audio(task_id, i,
-                        f"/tts/download_file?path={task_id}/{chunk_filename}", duration=chunk_dur)
+                    await task_manager.set_chunk_audio_with_quality(task_id, i,
+                        f"/tts/download_file?path={task_id}/{chunk_filename}", duration=chunk_dur, quality=quality)
                     await task_manager.recalc_progress(task_id)
             else:
                 for i in range(len(orig_texts)):
@@ -786,7 +798,8 @@ async def _run_generation(task_id: str):
                     chunk_path = task_dir(task_id) / chunk_filename
                     seg.export(str(chunk_path), format="wav")
                     chunk_dur = round(len(seg) / 1000, 3)
-                    await task_manager.set_chunk_audio(task_id, i, f"/tts/download_file?path={task_id}/{chunk_filename}", duration=chunk_dur)
+                    quality = await loop.run_in_executor(None, evaluate_segment_quality, orig_texts[i], str(chunk_path))
+                    await task_manager.set_chunk_audio_with_quality(task_id, i, f"/tts/download_file?path={task_id}/{chunk_filename}", duration=chunk_dur, quality=quality)
                     await task_manager.recalc_progress(task_id)
 
             print(f"[TTS] split synth total={time.time()-t_synth:.2f}s engine={engine_type} chunks={len(orig_texts)} chars={len(text)}")
@@ -825,6 +838,11 @@ async def get_status(task_id: str):
                 "audio_url": c["audio_path"],
                 "duration": c.get("duration", 0),
                 "error": c.get("error"),
+                "warning": c.get("warning", False),
+                "issues": c.get("issues", []),
+                "can_export": c.get("can_export", True),
+                "should_recommend_retry": c.get("should_recommend_retry", False),
+                "voice_id": c.get("voice_id", task.get("voice_id")),
             }
             for c in task.get("chunks", [])
         ],
@@ -852,9 +870,9 @@ async def regenerate_chunk(req: ChunkRegenRequest):
     chunk_gen_text = chunk_text
     if task.get("normalize"):
         chunk_gen_text = normalize_with_pause_protection(chunk_text)
-    voice_id = task["voice_id"]
+    voice_id = req.voice_id or task["voice_id"]
 
-    await task_manager.update_chunk(req.task_id, req.chunk_index, status="processing", text=chunk_text, gen_text=chunk_gen_text)
+    await task_manager.update_chunk(req.task_id, req.chunk_index, status="processing", text=chunk_text, gen_text=chunk_gen_text, voice_id=voice_id)
 
     try:
         pause_cfg = _load_pause_config()
@@ -867,9 +885,10 @@ async def regenerate_chunk(req: ChunkRegenRequest):
         sw = task.get("sway", -1.0)
         nms = task.get("num_step", 8)
         loop = asyncio.get_running_loop()
-        def _do(et=engine_type, t=chunk_gen_text, vid=voice_id, pc=pause_cfg, s=spd, p=pit, v=vol, n_audio=na, cfgv=cf, nsv=ns, swv=sw, nmsv=nms):
+        engine_type_reg = _validate_voice_mode(task["voice_mode"])
+        def _do(et=engine_type_reg, t=chunk_gen_text, vid=voice_id, pc=pause_cfg, s=spd, p=pit, v=vol, n_audio=na, cfgv=cf, nsv=ns, swv=sw, nmsv=nms):
             return synthesize_with_pauses(piper_engine, f5_engine, omnivoice_engine, t, et, vid, pc, speed=s, pitch=p, volume=v, normalize_audio=n_audio, cfg_strength=cfgv, steps=nsv, sway=swv, num_step=nmsv)
-        if engine_type in ("medium", "high"):
+        if engine_type_reg in ("medium", "high"):
             async with gpu_lock:
                 seg = await loop.run_in_executor(None, _do)
         else:
@@ -879,10 +898,12 @@ async def regenerate_chunk(req: ChunkRegenRequest):
         chunk_path = task_dir(req.task_id) / chunk_filename
         seg.export(str(chunk_path), format="wav")
         chunk_dur = round(len(seg) / 1000, 3)
-        await task_manager.set_chunk_audio(req.task_id, req.chunk_index, f"/tts/download_file?path={req.task_id}/{chunk_filename}", duration=chunk_dur)
+        quality = await loop.run_in_executor(None, evaluate_segment_quality, chunk_text, str(chunk_path))
+        await task_manager.set_chunk_audio_with_quality(req.task_id, req.chunk_index, f"/tts/download_file?path={req.task_id}/{chunk_filename}", duration=chunk_dur, quality=quality)
         await task_manager.recalc_progress(req.task_id)
 
-        return {"chunk_index": req.chunk_index, "status": "done", "audio_url": f"/tts/download_file?path={req.task_id}/{chunk_filename}"}
+        qs = quality["status"]
+        return {"chunk_index": req.chunk_index, "status": "done" if qs != "failed" else "error", "audio_url": f"/tts/download_file?path={req.task_id}/{chunk_filename}", "quality_status": qs, "issues": quality["issues"], "voice_id": voice_id}
     except Exception as e:
         await task_manager.set_chunk_error(req.task_id, req.chunk_index, str(e))
         raise HTTPException(500, str(e))
@@ -903,6 +924,8 @@ async def merge_chunks(req: MergeRequest):
     for c in chunks:
         if c["status"] != "done":
             raise HTTPException(400, f"Chunk {c['index']} is not done yet")
+        if not c.get("can_export", True):
+            raise HTTPException(400, f"Chunk {c['index']} failed quality check and cannot be exported")
 
     output_format = req.output_format or "mp3"
     loop = asyncio.get_running_loop()
@@ -1036,9 +1059,20 @@ async def reset_task(task_id: str):
 UPLOAD_DIR = OUTPUT_DIR / "_uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
+def _normalize_voice_name(name: str) -> str:
+    import unicodedata
+    nfkd = unicodedata.normalize('NFKD', name)
+    result = ''.join(c for c in nfkd if not unicodedata.combining(c))
+    result = result.replace('đ', 'd').replace('Đ', 'D')
+    result = re.sub(r'[^a-zA-Z0-9]+', '_', result).strip('_').lower()
+    return result if result else name.strip().replace(' ', '_').lower()
+
+
 @app.post("/tts/clone")
-async def clone_voice(voice_id: str = Form(...), ref_text: str = Form(...), ref_audio: UploadFile = File(...)):
-    vid = voice_id.strip()
+async def clone_voice(voice_id: str = Form(...), ref_text: str = Form(...), ref_audio: UploadFile = File(...),
+                      gender: str = Form("male"), description: str = Form("No description")):
+    raw_name = voice_id.strip()
+    vid = _normalize_voice_name(raw_name)
     if not vid:
         raise HTTPException(400, "Voice ID is required")
     if not ref_text.strip():
@@ -1053,11 +1087,68 @@ async def clone_voice(voice_id: str = Form(...), ref_text: str = Form(...), ref_
     try:
         loop = asyncio.get_running_loop()
         # Save to shared directory — both F5 and OmniVoice read from here
-        await loop.run_in_executor(None, f5_engine.clone_voice, str(upload_path), ref_text, vid)
-        await loop.run_in_executor(None, omnivoice_engine.clone_voice, str(upload_path), ref_text, vid)
-        return {"voice_id": vid, "status": "cloned"}
+        await loop.run_in_executor(None, f5_engine.clone_voice, str(upload_path), ref_text, vid, gender, description, raw_name)
+        await loop.run_in_executor(None, omnivoice_engine.clone_voice, str(upload_path), ref_text, vid, gender, description, raw_name)
+        return {"voice_id": vid, "raw_name": raw_name, "status": "cloned"}
     except Exception as e:
         raise HTTPException(500, str(e))
+
+
+# ─── Voice management (delete / update) ───
+
+def _read_voices_json() -> list[dict]:
+    meta_file = F5_VOICES_DIR / "voices.json"
+    if not meta_file.exists():
+        return []
+    try:
+        return json.loads(meta_file.read_text(encoding="utf-8"))
+    except Exception:
+        return []
+
+def _write_voices_json(entries: list[dict]):
+    meta_file = F5_VOICES_DIR / "voices.json"
+    meta_file.write_text(json.dumps(entries, ensure_ascii=False, indent=2), encoding="utf-8")
+
+@app.delete("/tts/voices/{voice_id}")
+async def delete_voice(voice_id: str):
+    entries = _read_voices_json()
+    entry = next((e for e in entries if Path(e.get("audio_path", "")).stem == voice_id), None)
+    if not entry:
+        raise HTTPException(404, "Voice not found")
+    if not entry.get("clone"):
+        raise HTTPException(400, "Cannot delete default voice")
+
+    for ext in (".wav", ".mp3", ".txt"):
+        f = F5_VOICES_DIR / f"{voice_id}{ext}"
+        if f.exists():
+            f.unlink()
+
+    entries = [e for e in entries if Path(e.get("audio_path", "")).stem != voice_id]
+    _write_voices_json(entries)
+
+    # Clear caches
+    f5_engine._audio_cache.pop(voice_id, None)
+    omnivoice_engine._voice_prompts.pop(voice_id, None)
+
+    return {"status": "deleted", "voice_id": voice_id}
+
+
+class VoiceUpdateRequest(BaseModel):
+    description: str | None = None
+    gender: str | None = None
+
+@app.patch("/tts/voices/{voice_id}")
+async def update_voice(voice_id: str, req: VoiceUpdateRequest):
+    entries = _read_voices_json()
+    for e in entries:
+        if Path(e.get("audio_path", "")).stem == voice_id:
+            if req.description is not None:
+                e["description"] = req.description
+            if req.gender is not None:
+                e["gender"] = req.gender
+            _write_voices_json(entries)
+            return {"status": "updated", "voice_id": voice_id}
+    raise HTTPException(404, "Voice not found")
 
 
 # ─── Dictionary ───

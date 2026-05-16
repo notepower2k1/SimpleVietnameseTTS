@@ -2639,8 +2639,8 @@
           <div id="chunkList" style="flex:1;">
             <div class="no-chunks">Enter text and click Generate to see segments</div>
           </div>
-          <div id="mergeSection" class="hidden" style="margin-top:14px;">
-            <button class="btn-merge" id="mergeBtn">
+          <div id="mergeSection" class="hidden" style="margin-top:14px;display:flex;gap:8px;">
+            <button class="btn-merge" id="mergeBtn" style="flex:1;">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
                 stroke-linejoin="round" style="width:18px;height:18px;">
                 <path d="M8 6L21 6" />
@@ -2651,6 +2651,17 @@
                 <line x1="3" y1="18" x2="3.01" y2="18" />
               </svg>
               Merge &amp; Download All
+            </button>
+            <button class="btn-merge" id="downloadAllBtn"
+              style="flex:0 0 auto;padding:12px 16px;background:var(--bg-secondary);color:var(--text-secondary);border:1px solid var(--card-border);width:auto;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                stroke-linejoin="round" style="width:18px;height:18px;">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/>
+                <line x1="12" y1="15" x2="12" y2="3"/>
+                <line x1="12" y1="1" x2="12" y2="3"/>
+              </svg>
+              Download All
             </button>
           </div>
         </div>
@@ -2877,6 +2888,18 @@
           <button class="dict-tab" data-tab="medium" onclick="switchVoiceTab('medium')">Medium — F5</button>
           <button class="dict-tab" data-tab="high" onclick="switchVoiceTab('high')">High — OmniVoice</button>
         </div>
+        <div class="voice-filter-bar" style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
+          <select id="voiceGenderFilter" onchange="renderCurrentVoiceTab()" style="padding:5px 10px;border:1px solid var(--card-border);border-radius:var(--radius-sm);font-size:12px;background:var(--card-bg);color:var(--text-secondary);font-family:inherit;">
+            <option value="">All Genders</option>
+            <option value="male">Male</option>
+            <option value="female">Female</option>
+          </select>
+          <select id="voiceTypeFilter" onchange="renderCurrentVoiceTab()" style="padding:5px 10px;border:1px solid var(--card-border);border-radius:var(--radius-sm);font-size:12px;background:var(--card-bg);color:var(--text-secondary);font-family:inherit;">
+            <option value="">All Types</option>
+            <option value="default">Default</option>
+            <option value="clone">Clone</option>
+          </select>
+        </div>
         <div id="voiceLowList" class="voice-grid" style="max-height:420px;overflow-y:auto;"></div>
         <div id="voiceMediumList" class="voice-grid hidden" style="max-height:420px;overflow-y:auto;"></div>
         <div id="voiceHighList" class="voice-grid hidden" style="max-height:420px;overflow-y:auto;"></div>
@@ -2920,6 +2943,13 @@
         </h2>
         <label>Voice Name</label>
         <input id="cloneVoiceName" placeholder="e.g. my_voice_1">
+        <label>Gender</label>
+        <select id="cloneVoiceGender" style="width:100%;padding:10px 12px;border:1px solid var(--card-border);border-radius:var(--radius-sm);font-size:14px;background:var(--bg-primary);color:var(--text-primary);font-family:inherit;">
+          <option value="male">Male</option>
+          <option value="female">Female</option>
+        </select>
+        <label>Description</label>
+        <textarea id="cloneVoiceDesc" placeholder="No description" style="min-height:50px;"></textarea>
         <label>Reference Audio</label>
         <input type="file" id="cloneRefAudio" accept="audio/*">
         <label>Reference Text</label>
@@ -3489,30 +3519,47 @@
         document.getElementById('voiceLowList').classList.toggle('hidden', tab !== 'low');
         document.getElementById('voiceMediumList').classList.toggle('hidden', tab !== 'medium');
         document.getElementById('voiceHighList').classList.toggle('hidden', tab !== 'high');
-        renderVoiceList(tab);
+        renderCurrentVoiceTab();
+      }
+
+      function renderCurrentVoiceTab() {
+        const active = document.querySelector('#voiceModal .dict-tab.active');
+        renderVoiceList(active ? active.dataset.tab : CURRENT_VOICE_MODE);
       }
 
       function renderVoiceList(mode) {
         const containerId = mode === 'low' ? 'voiceLowList' : mode === 'medium' ? 'voiceMediumList' : 'voiceHighList';
         const container = document.getElementById(containerId);
-        const list = ALL_VOICES[mode] || [];
+        const genderFilter = document.getElementById('voiceGenderFilter')?.value || '';
+        const typeFilter = document.getElementById('voiceTypeFilter')?.value || '';
+        let list = ALL_VOICES[mode] || [];
+        if (genderFilter) list = list.filter(v => v.gender === genderFilter);
+        if (typeFilter === 'clone') list = list.filter(v => v.is_clone);
+        else if (typeFilter === 'default') list = list.filter(v => !v.is_clone);
         if (list.length === 0) {
-          container.innerHTML = '<div class="hist-empty">No voices available</div>'; return;
+          container.innerHTML = '<div class="hist-empty">No voices match the filter</div>'; return;
         }
         container.innerHTML = list.map(v => {
           const isSelected = v.id === CURRENT_VOICE_ID && CURRENT_VOICE_MODE === mode;
           const genderIcon = v.gender === 'male' ? '&#9794;' : v.gender === 'female' ? '&#9792;' : '&#9733;';
           const genderColor = v.gender === 'male' ? 'var(--accent-primary)' : v.gender === 'female' ? '#c47a9e' : 'var(--text-muted)';
+          const cloneBadge = v.is_clone ? '<span style="font-size:10px;background:var(--accent-gold);color:#fff;padding:1px 6px;border-radius:8px;margin-left:6px;font-weight:600;">CLONE</span>' : '<span style="font-size:10px;background:var(--bg-secondary);color:var(--text-muted);padding:1px 6px;border-radius:8px;margin-left:6px;">DEFAULT</span>';
           return `<div class="voice-card ${isSelected ? 'selected' : ''}" onclick="selectVoiceFromCard('${mode}','${v.id}')">
       <div class="voice-card-avatar" style="background:${genderColor}15;color:${genderColor};border-color:${genderColor}40;">${genderIcon}</div>
       <div class="voice-card-info">
-        <div class="voice-card-name">${escapeHtml(v.label)}</div>
+        <div class="voice-card-name">${escapeHtml(v.label)}${cloneBadge}</div>
         <div class="voice-card-desc" title="${escapeHtml(v.description || v.ref_text || '')}">${escapeHtml(v.description || v.ref_text || '')}</div>
       </div>
-      <div class="voice-card-actions">
+      <div class="voice-card-actions" style="display:flex;gap:4px;align-items:center;">
         <button onclick="event.stopPropagation();previewVoice('${mode}','${v.id}')" title="Preview">
           <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
         </button>
+        ${v.is_clone ? `<button onclick="event.stopPropagation();editVoiceDesc('${mode}','${v.id}')" title="Edit description">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        </button>` : ''}
+        ${v.is_clone ? `<button onclick="event.stopPropagation();deleteVoice('${mode}','${v.id}')" title="Delete voice" style="color:var(--error);">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+        </button>` : ''}
       </div>
     </div>`;
         }).join('');
@@ -3532,6 +3579,37 @@
           updateCharCount();
           renderVoiceList(mode);
         }
+      }
+
+      function editVoiceDesc(mode, id) {
+        const list = ALL_VOICES[mode] || [];
+        const v = list.find(x => x.id === id);
+        if (!v) return;
+        const newDesc = prompt('Edit description:', v.description || '');
+        if (newDesc === null) return;
+        fetch(`${API_BASE}/tts/voices/${id}`, {
+          method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ description: newDesc.trim() || 'No description' }),
+        }).then(r => { if (!r.ok) throw new Error('Failed'); return r.json(); })
+        .then(() => { loadVoices().then(() => renderCurrentVoiceTab()); showToast('Description updated'); })
+        .catch(() => alert('Failed to update description'));
+      }
+
+      function deleteVoice(mode, id) {
+        if (!confirm('Delete this cloned voice?')) return;
+        fetch(`${API_BASE}/tts/voices/${id}`, { method: 'DELETE' })
+        .then(r => { if (!r.ok) throw new Error('Failed'); return r.json(); })
+        .then(() => {
+          loadVoices().then(() => {
+            renderCurrentVoiceTab();
+            if (CURRENT_VOICE_ID === id) {
+              const first = Object.values(ALL_VOICES).flat()[0];
+              if (first) selectVoiceFromCard(first.engine === 'f5' ? 'medium' : first.engine === 'omnivoice' ? 'high' : first.engine || 'low', first.id);
+            }
+          });
+          showToast('Voice deleted');
+        })
+        .catch(() => alert('Cannot delete default voice'));
       }
 
       function previewVoice(mode, id) {
@@ -3581,6 +3659,8 @@
       document.getElementById('selectVoiceBtn').addEventListener('click', () => {
         const modal = document.getElementById('voiceModal');
         modal.classList.remove('hidden');
+        document.getElementById('voiceGenderFilter').value = '';
+        document.getElementById('voiceTypeFilter').value = '';
         switchVoiceTab(CURRENT_VOICE_MODE);
       });
       document.getElementById('voiceCloseBtn').addEventListener('click', () => {
@@ -3942,6 +4022,10 @@
         progressFloat.classList.remove('visible');
       });
 
+      document.getElementById('downloadAllBtn').addEventListener('click', () => {
+        downloadAllChunks();
+      });
+
       downloadBtn.addEventListener('click', () => {
         if (!CURRENT_AUDIO_URL) return;
         const fmt = formatSelect.value;
@@ -4278,16 +4362,6 @@
           return;
         }
 
-        function downloadChunk(index) {
-          const d = CHUNK_DATA.find(x => x.index === index);
-          if (!d || !d.audio_url) return;
-          const fmt = formatSelect.value || 'mp3';
-          const a = document.createElement('a');
-          a.href = `${API_BASE}${d.audio_url}&format=${fmt}`;
-          a.download = `tts_output.${fmt}`;
-          a.click();
-        }
-
         // Multiple chunks (split mode) — show compact list with pagination
         const totalPages = Math.ceil(filteredChunks.length / CHUNK_PER_PAGE);
         if (CHUNK_PAGE >= totalPages) CHUNK_PAGE = totalPages - 1;
@@ -4324,13 +4398,20 @@
           ${duration ? `<span style="font-size:11px;color:var(--text-muted);font-family:'JetBrains Mono',monospace;flex-shrink:0;">${duration}</span>` : ''}
           <span class="chunk-actions">
             ${c.status === 'done' ? `<button onclick="event.stopPropagation();playChunk(${c.index})" title="Play"><svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg></button>` : ''}
+            ${c.status === 'done' ? `<button onclick="event.stopPropagation();downloadChunk(${c.index})" title="Download"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>` : ''}
             ${c.status === 'done' || c.status === 'error' ? `<button onclick="event.stopPropagation();retryChunk(${c.index})" title="Retry"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg></button>` : ''}
             <button onclick="event.stopPropagation();toggleEdit(${c.index})" title="Edit" id="editBtn_${c.index}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
           </span>
         </div>
         <div class="chunk-body" id="chunkBody_${c.index}">
+          ${chunks.length > 1 ? `<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+            <span style="font-size:12px;color:var(--text-muted);flex-shrink:0;font-weight:600;">Voice:</span>
+            <select id="chunkVoice_${c.index}" onchange="updateChunkVoice(${c.index},this.value)" style="flex:1;padding:5px 8px;border:1px solid var(--card-border);border-radius:var(--radius-sm);font-size:12px;background:var(--card-bg);color:var(--text-secondary);font-family:inherit;">
+              ${(ALL_VOICES[CURRENT_VOICE_MODE] || []).map(v => `<option value="${v.id}" ${(c.voice_id || CURRENT_VOICE_ID) === v.id ? 'selected' : ''}>${v.label}</option>`).join('')}
+            </select>
+          </div>` : ''}
           <textarea id="chunkText_${c.index}" readonly>${escapeHtml(c.text)}</textarea>
-          ${hasWarning ? `<div style="margin-top:8px;padding:8px 12px;background:var(--warning-light);border-radius:var(--radius-sm);font-size:12px;color:var(--warning);">⚠ ${c.warning_message || 'Audio quality warning detected'}</div>` : ''}
+          ${hasWarning || (c.issues && c.issues.length > 0) ? `<div style="margin-top:8px;padding:8px 12px;background:var(--warning-light);border-radius:var(--radius-sm);font-size:12px;color:var(--warning);">${(c.issues || []).map(i => `<div style="margin:2px 0">⚠ <strong>${i.message}</strong>${i.details && i.details.duration_sec ? ` (${i.details.duration_sec}s)` : ''}</div>`).join('') || '⚠ Audio quality warning detected'}</div>` : ''}
         </div>
       </div>`;
         }
@@ -4440,6 +4521,36 @@
         return d.innerHTML;
       }
 
+      function downloadChunk(index) {
+        const d = CHUNK_DATA.find(x => x.index === index);
+        if (!d || !d.audio_url) return;
+        const a = document.createElement('a');
+        a.href = `${API_BASE}${d.audio_url}&format=wav`;
+        a.download = `segment_${index + 1}.wav`;
+        a.click();
+      }
+
+      function downloadAllChunks() {
+        const done = CHUNK_DATA.filter(c => c.status === 'done' && c.audio_url);
+        if (done.length === 0) { showToast('No segments to download'); return; }
+        for (const c of done) {
+          setTimeout(() => {
+            const a = document.createElement('a');
+            a.href = `${API_BASE}${c.audio_url}&format=wav`;
+            a.download = `segment_${c.index + 1}.wav`;
+            a.click();
+          }, c.index * 300);
+        }
+        showToast(`Downloading ${done.length} segments`);
+      }
+
+      function updateChunkVoice(index, voiceId) {
+        const c = CHUNK_DATA.find(x => x.index === index);
+        if (c) {
+          c.voice_id = voiceId;
+        }
+      }
+
       function playChunk(index) {
         const c = CHUNK_DATA.find(x => x.index === index);
         if (!c || !c.audio_url) return;
@@ -4486,11 +4597,13 @@
 
       async function _regenChunk(index, text) {
         if (!CURRENT_TASK_ID) return;
+        const c = CHUNK_DATA.find(x => x.index === index);
+        const vid = c?.voice_id || CURRENT_VOICE_ID;
         try {
           const res = await fetch(`${API_BASE}/tts/regenerate_chunk`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ task_id: CURRENT_TASK_ID, chunk_index: index, text }),
+            body: JSON.stringify({ task_id: CURRENT_TASK_ID, chunk_index: index, text, voice_id: vid }),
           });
           if (!res.ok) throw new Error('Regen failed');
           const data = await res.json();
@@ -4601,25 +4714,37 @@
       /* Modal */
       newVoiceBtn.addEventListener('click', () => {
         voiceLabModal.classList.remove('hidden');
-        cloneVoiceName.value = ''; cloneRefAudio.value = ''; cloneRefAudio.type = 'text'; cloneRefAudio.type = 'file'; cloneRefText.value = '';
+        cloneVoiceName.value = ''; cloneVoiceGender.value = 'male'; cloneVoiceDesc.value = ''; cloneRefAudio.value = ''; cloneRefAudio.type = 'text'; cloneRefAudio.type = 'file'; cloneRefText.value = '';
       });
       cloneCancelBtn.addEventListener('click', () => voiceLabModal.classList.add('hidden'));
       cloneSaveBtn.addEventListener('click', async () => {
-        const voiceId = cloneVoiceName.value.trim();
+        const rawName = cloneVoiceName.value.trim();
+        const gender = cloneVoiceGender.value;
+        const description = cloneVoiceDesc.value.trim() || 'No description';
         const audioFile = cloneRefAudio.files[0];
         const refText = cloneRefText.value.trim();
-        if (!voiceId || !audioFile || !refText) { alert('Fill all fields and select an audio file'); return; }
+        if (!rawName || !audioFile || !refText) { alert('Fill all fields and select an audio file'); return; }
         cloneSaveBtn.disabled = true; cloneSaveBtn.textContent = 'Uploading...';
         try {
           const fd = new FormData();
-          fd.append('voice_id', voiceId);
+          fd.append('voice_id', rawName);
+          fd.append('gender', gender);
+          fd.append('description', description);
           fd.append('ref_text', refText);
           fd.append('ref_audio', audioFile);
           const res = await fetch(`${API_BASE}/tts/clone`, { method: 'POST', body: fd });
           if (!res.ok) throw new Error('Clone failed');
+          const data = await res.json();
           voiceLabModal.classList.add('hidden');
-          await loadVoices(); CURRENT_VOICE_MODE = 'custom'; CURRENT_VOICE_ID = voiceId; updateVoiceLabel();
-          showToast('Voice "' + voiceId + '" cloned');
+          await loadVoices();
+          CURRENT_VOICE_ID = data.voice_id;
+          for (const m of ['medium', 'high', 'low']) {
+            if ((ALL_VOICES[m] || []).find(v => v.id === data.voice_id)) {
+              CURRENT_VOICE_MODE = m; break;
+            }
+          }
+          updateVoiceLabel();
+          showToast('Voice "' + (data.raw_name || rawName) + '" cloned');
         } catch (e) { alert('Error: ' + e.message); }
         cloneSaveBtn.disabled = false; cloneSaveBtn.textContent = 'Save Voice';
       });

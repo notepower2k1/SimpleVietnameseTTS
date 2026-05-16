@@ -246,6 +246,28 @@ class TaskManager:
                 task["chunks"][chunk_index]["duration"] = duration
                 task["chunks"][chunk_index]["status"] = "done"
 
+    async def set_chunk_audio_with_quality(self, task_id: str, chunk_index: int, audio_path: str, duration: float, quality: dict):
+        async with self._lock:
+            task = self._tasks.get(task_id)
+            if task and chunk_index < len(task["chunks"]):
+                chunk = task["chunks"][chunk_index]
+                chunk["audio_path"] = audio_path
+                chunk["duration"] = duration
+                chunk["issues"] = quality["issues"]
+                chunk["quality_metrics"] = quality["metrics"]
+                chunk["can_export"] = quality["can_export"]
+                chunk["should_recommend_retry"] = quality["should_recommend_retry"]
+                if quality["status"] == "failed":
+                    chunk["status"] = "error"
+                    chunk["error"] = quality["issues"][0]["message"] if quality["issues"] else "Quality check failed"
+                    chunk["warning"] = False
+                elif quality["status"] == "warning":
+                    chunk["status"] = "done"
+                    chunk["warning"] = True
+                else:
+                    chunk["status"] = "done"
+                    chunk["warning"] = False
+
     async def set_chunk_error(self, task_id: str, chunk_index: int, error: str):
         async with self._lock:
             task = self._tasks.get(task_id)
