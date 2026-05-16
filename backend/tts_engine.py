@@ -716,7 +716,7 @@ class TaskManager:
         self._tasks: dict[str, dict] = {}
         self._lock = asyncio.Lock()
 
-    async def create(self, text: str, voice_mode: str, voice_id: str, output_format: str = "mp3", normalize: bool = False, clean: bool = False, normalize_audio: bool = True, speed: float = 1.0, pitch: float = 0.0, volume: float = 0.0, split_segments: bool = False, cfg_strength: float = 2.0, steps: int = 32, sway: float = -1.0, num_step: int = 16) -> str:
+    async def create(self, text: str, voice_mode: str, voice_id: str, output_format: str = "mp3", normalize: bool = False, clean: bool = False, normalize_audio: bool = True, speed: float = 1.0, pitch: float = 0.0, volume: float = 0.0, split_segments: bool = False, split_mode: str = "default", cfg_strength: float = 2.0, steps: int = 32, sway: float = -1.0, num_step: int = 16) -> str:
         task_id = uuid.uuid4().hex[:12]
         engine_type = voice_mode if voice_mode in ("preset", "custom") else "preset"
         raw_chunks = chunk_text_sentences(text)
@@ -744,6 +744,7 @@ class TaskManager:
                 "pitch": pitch,
                 "volume": volume,
                 "split_segments": split_segments,
+                "split_mode": split_mode,
                 "cfg_strength": cfg_strength,
                 "steps": steps,
                 "sway": sway,

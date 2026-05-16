@@ -173,6 +173,8 @@ class TTSRequest(BaseModel):
     clean: bool = False
     normalize_audio: bool = True
     speed: float = 1.0
+    split_segments: bool = True
+    split_mode: str = "default"
 
 
 class ChunkRegenRequest(BaseModel):
@@ -256,6 +258,7 @@ async def generate_tts(req: TTSRequest):
         text=text, voice_mode=req.voice_mode, voice_id=req.voice_id,
         output_format=req.output_format or "mp3", normalize=req.normalize,
         clean=req.clean, normalize_audio=req.normalize_audio, speed=req.speed,
+        split_segments=req.split_segments, split_mode=req.split_mode if req.split_segments else "default",
     )
 
     asyncio.create_task(_run_generation(task_id))
@@ -271,6 +274,7 @@ async def _run_generation(task_id: str):
     output_format = task["output_format"]
     do_normalize = task.get("normalize")
     do_clean = task.get("clean")
+    split_mode = task.get("split_mode", "default")
 
     try:
         await task_manager.update(task_id, status="processing", progress=0, stage="splitting")
@@ -281,20 +285,33 @@ async def _run_generation(task_id: str):
             await task_manager.update(task_id, status="error", error="No text to process")
             return
 
-        raw_paragraphs = re.split(r'\n\s*\n', text.strip())
-        para_sentence_counts = []
-        for p in raw_paragraphs:
-            p = p.strip()
-            if p:
-                sents = [s.strip() for s in re.split(r'(?<=[.!?])\s+', p) if s.strip()]
-                para_sentence_counts.append(len(sents))
-        is_new_para = []
-        for count in para_sentence_counts:
-            for j in range(count):
-                is_new_para.append(j == 0)
+        if split_mode == "sentence":
+            sents = [s.strip() for s in re.split(r'(?<=[.!?])\s+', text.strip()) if s.strip()]
+            if not sents:
+                sents = [text]
+            orig_texts = sents
+            gen_texts = list(sents)
+            is_new_para = [False] * len(sents)
+        elif split_mode == "paragraph":
+            paras = [p.strip() for p in re.split(r'\n\s*\n', text.strip()) if p.strip()]
+            orig_texts = paras
+            gen_texts = list(paras)
+            is_new_para = [True] * len(paras)
+        else:
+            raw_paragraphs = re.split(r'\n\s*\n', text.strip())
+            para_sentence_counts = []
+            for p in raw_paragraphs:
+                p = p.strip()
+                if p:
+                    sents = [s.strip() for s in re.split(r'(?<=[.!?])\s+', p) if s.strip()]
+                    para_sentence_counts.append(len(sents))
+            is_new_para = []
+            for count in para_sentence_counts:
+                for j in range(count):
+                    is_new_para.append(j == 0)
+            orig_texts = list(raw_chunks)
+            gen_texts = list(raw_chunks)
 
-        orig_texts = list(raw_chunks)
-        gen_texts = list(raw_chunks)
         if do_normalize:
             gen_texts = [normalize_with_pause_protection(c) for c in orig_texts]
 
@@ -338,6 +355,7 @@ async def _run_generation(task_id: str):
             await task_manager.set_chunk_audio_with_quality(task_id, i, f"/tts/download_file?path={task_id}/{chunk_filename}", duration=chunk_dur, quality=quality)
             await task_manager.recalc_progress(task_id)
 
+        await _save_segments_meta(task_id)
         await task_manager.update(task_id, status="chunks_done", progress=85, stage="chunks_done")
 
     except Exception as e:
@@ -483,33 +501,82 @@ async def merge_chunks(req: MergeRequest):
     return {"audio_url": f"/tts/download_file?path={req.task_id}/{output_filename}", "duration": duration}
 
 
+# ─── Segment metadata (for on-the-fly SRT generation) ───
+
+async def _save_segments_meta(task_id: str):
+    import json
+    td = task_dir(task_id)
+    task = await task_manager.get(task_id)
+    if task and task.get("chunks"):
+        segments = [{"text": c.get("gen_text", c.get("text", "")), "duration": c.get("duration", 0)} for c in task["chunks"]]
+        (td / "segments.json").write_text(json.dumps(segments, ensure_ascii=False), encoding="utf-8")
+
+def _load_segments_meta(task_id: str) -> list[dict]:
+    import json
+    meta_path = task_dir(task_id) / "segments.json"
+    if not meta_path.exists():
+        return []
+    try:
+        return json.loads(meta_path.read_text(encoding="utf-8"))
+    except Exception:
+        return []
+
+
 @app.get("/tts/download_file")
-async def download_file(path: str = Query(...), format: str = Query("mp3")):
+async def download_file(path: str = Query(...), format: str = Query("")):
     file_path = OUTPUT_DIR / path
     if not file_path.exists():
         raise HTTPException(404, "File not found")
-    target_fmt = format.lower()
 
+    target_fmt = format.lower() if format else ""
     if target_fmt == "srt":
         task_id = path.split("/")[0]
         srt_path = OUTPUT_DIR / task_id / "final.srt"
-        if not srt_path.exists():
-            raise HTTPException(404, "SRT file not found")
-        return FileResponse(str(srt_path), media_type="text/plain", headers={"Content-Disposition": 'attachment; filename="subtitles.srt"'})
+        if srt_path.exists():
+            return FileResponse(str(srt_path), media_type="text/plain", headers={"Content-Disposition": 'attachment; filename="subtitles.srt"'})
+        segs = _load_segments_meta(task_id)
+        if segs:
+            srt_lines = []
+            cum_ms = 0
+            for idx, s in enumerate(segs):
+                dur_ms = int(s.get("duration", 0) * 1000)
+                if dur_ms <= 0:
+                    continue
+                def _ms2srt(ms):
+                    h, rem = divmod(ms, 3600000)
+                    m, rem = divmod(rem, 60000)
+                    s, ms = divmod(rem, 1000)
+                    return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
+                srt_lines.append(str(idx + 1))
+                srt_lines.append(f"{_ms2srt(cum_ms)} --> {_ms2srt(cum_ms + dur_ms)}")
+                srt_lines.append(s.get("text", f"Segment {idx + 1}"))
+                srt_lines.append("")
+                cum_ms += dur_ms
+            content = "\n".join(srt_lines)
+            return Response(content=content, media_type="text/plain", headers={"Content-Disposition": 'attachment; filename="subtitles.srt"'})
+        raise HTTPException(404, "SRT file not found")
 
-    if target_fmt not in ("mp3", "wav"):
-        target_fmt = "mp3"
     src_fmt = file_path.suffix.lstrip(".")
-    if src_fmt == target_fmt:
-        media_type = "audio/mpeg" if target_fmt == "mp3" else "audio/wav"
-        return FileResponse(str(file_path), media_type=media_type, filename=f"tts_output.{target_fmt}")
+    if not target_fmt or (target_fmt == "mp3_320" and src_fmt == "mp3"):
+        # Serve original file (already 320k or no conversion needed)
+        media_type = "audio/mpeg" if src_fmt == "mp3" else "audio/wav"
+        return FileResponse(str(file_path), media_type=media_type)
+
+    # Format conversion
+    if target_fmt not in ("mp3", "mp3_320", "wav"):
+        target_fmt = "mp3"
     loop = asyncio.get_running_loop()
     audio = await loop.run_in_executor(None, AudioSegment.from_file, str(file_path))
     buf = io.BytesIO()
-    await loop.run_in_executor(None, lambda: audio.export(buf, format=target_fmt))
+    if target_fmt == "mp3_320":
+        await loop.run_in_executor(None, lambda: audio.export(buf, format="mp3", bitrate="320k"))
+    elif target_fmt == "mp3":
+        await loop.run_in_executor(None, lambda: audio.export(buf, format="mp3", bitrate="128k"))
+    else:
+        await loop.run_in_executor(None, lambda: audio.export(buf, format=target_fmt))
     buf.seek(0)
-    media_type = "audio/mpeg" if target_fmt == "mp3" else "audio/wav"
-    return Response(content=buf.read(), media_type=media_type, headers={"Content-Disposition": f'attachment; filename="tts_output.{target_fmt}"'})
+    media_type = "audio/mpeg" if target_fmt in ("mp3", "mp3_320") else "audio/wav"
+    return Response(content=buf.read(), media_type=media_type)
 
 
 @app.post("/tts/reset/{task_id}")

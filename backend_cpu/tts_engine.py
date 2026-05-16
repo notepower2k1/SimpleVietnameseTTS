@@ -203,7 +203,7 @@ class TaskManager:
         self._tasks: dict[str, dict] = {}
         self._lock = asyncio.Lock()
 
-    async def create(self, text: str, voice_mode: str, voice_id: str, output_format: str = "mp3", normalize: bool = False, clean: bool = False, normalize_audio: bool = True, speed: float = 1.0, pitch: float = 0.0, volume: float = 0.0) -> str:
+    async def create(self, text: str, voice_mode: str, voice_id: str, output_format: str = "mp3", normalize: bool = False, clean: bool = False, normalize_audio: bool = True, speed: float = 1.0, pitch: float = 0.0, volume: float = 0.0, split_segments: bool = True, split_mode: str = "default") -> str:
         task_id = uuid.uuid4().hex[:12]
         raw_chunks = chunk_text_sentences(text)
         chunks = []
@@ -218,6 +218,7 @@ class TaskManager:
                 "voice_id": voice_id, "output_format": output_format,
                 "normalize": normalize, "clean": clean, "normalize_audio": normalize_audio,
                 "speed": speed, "pitch": pitch, "volume": volume,
+                "split_segments": split_segments, "split_mode": split_mode,
                 "chunks": chunks, "status": "pending", "progress": 0,
                 "stage": "queued", "audio_url": None, "duration": None, "error": None,
             }

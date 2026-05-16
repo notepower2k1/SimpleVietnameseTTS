@@ -1248,26 +1248,9 @@
       color: var(--text-primary);
     }
 
-    .final-audio-metadata {
-      display: flex;
-      gap: 20px;
-      flex-wrap: wrap;
-      margin-top: 16px;
-      padding-top: 12px;
-      border-top: 1px solid var(--card-border);
-      font-size: 12px;
-      color: var(--text-secondary);
-    }
-
-    .final-audio-metadata span {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-    }
-
     .waveform-wrap {
       position: relative;
-      margin-top: 12px;
+      margin-top: 8px;
       cursor: pointer;
       border-radius: var(--radius-sm);
       overflow: hidden;
@@ -1315,13 +1298,6 @@
       opacity: 1;
     }
 
-    .export-options {
-      display: flex;
-      gap: 8px;
-      margin-top: 16px;
-      flex-wrap: wrap;
-    }
-
     .autosave-indicator {
       font-size: 11px;
       color: var(--text-muted);
@@ -1336,12 +1312,84 @@
       height: 12px;
     }
 
-    /* Custom audio player */
-    .custom-player {
+    /* Final Audio section */
+    .fa-time-row {
       display: flex;
       align-items: center;
       gap: 10px;
-      padding: 8px 0;
+      padding: 4px 0;
+    }
+
+    .fa-time {
+      font-size: 12px;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--text-secondary);
+      min-width: 36px;
+      flex-shrink: 0;
+    }
+
+    .fa-time:last-child {
+      text-align: right;
+    }
+
+    .fa-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 0;
+    }
+
+    .fa-controls-left {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex: 0 0 auto;
+    }
+
+    .fa-controls-center {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex: 1;
+      justify-content: center;
+    }
+
+    .fa-controls-right {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex: 0 0 auto;
+    }
+
+    .fa-speed {
+      padding: 4px 8px;
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius-sm);
+      font-size: 12px;
+      font-family: 'JetBrains Mono', monospace;
+      background: var(--bg-secondary);
+      color: var(--text-secondary);
+      cursor: pointer;
+    }
+
+    .fa-speed:hover {
+      border-color: var(--accent-primary);
+    }
+
+    .fa-export-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
+      align-items: center;
+    }
+
+    .fa-format-select {
+      padding: 8px 12px;
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      background: var(--card-bg);
+      color: var(--text-secondary);
     }
 
     .cp-btn {
@@ -1369,6 +1417,31 @@
       height: 16px;
     }
 
+    .cp-btn.cp-play {
+      width: 42px;
+      height: 42px;
+      background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-primary-hover) 100%);
+      box-shadow: 0 2px 8px rgba(91, 122, 106, 0.3);
+    }
+
+    .cp-btn.cp-play svg {
+      width: 20px;
+      height: 20px;
+    }
+
+    .cp-btn.cp-seek {
+      width: 34px;
+      height: 34px;
+      background: var(--bg-secondary);
+      color: var(--text-secondary);
+    }
+
+    .cp-btn.cp-seek:hover {
+      background: var(--accent-primary);
+      color: #fff;
+      box-shadow: none;
+    }
+
     .cp-btn.cp-vol {
       width: 32px;
       height: 32px;
@@ -1382,33 +1455,9 @@
       box-shadow: none;
     }
 
-    .cp-btn#cpSpeedBtn {
-      width: auto;
-      border-radius: var(--radius-sm);
-      padding: 0 10px;
-      font-size: 12px;
-      font-family: 'JetBrains Mono', monospace;
-      font-weight: 600;
-      background: var(--bg-secondary);
-      color: var(--text-secondary);
-    }
-
-    .cp-btn#cpSpeedBtn:hover {
-      background: var(--accent-primary);
-      color: #fff;
-    }
-
-    .cp-time {
-      font-size: 12px;
-      font-family: 'JetBrains Mono', monospace;
-      color: var(--text-secondary);
-      min-width: 90px;
-      flex-shrink: 0;
-    }
-
     .cp-progress-bg {
       flex: 1;
-      height: 6px;
+      height: 5px;
       background: var(--card-border);
       border-radius: 3px;
       cursor: pointer;
@@ -1417,7 +1466,7 @@
     }
 
     .cp-progress-bg:hover {
-      height: 8px;
+      height: 7px;
     }
 
     .cp-progress-fill {
@@ -1448,7 +1497,7 @@
     }
 
     .cp-vol-slider {
-      width: 70px;
+      width: 60px;
       height: 4px;
       -webkit-appearance: none;
       appearance: none;
@@ -2470,6 +2519,13 @@
               <span style="font-size:11px;color:var(--text-muted);font-weight:400;margin-left:4px;">— But no
                 per-sentence editing & paragraph pauses</span>
             </label>
+            <div id="splitModeOptions" style="display:none;margin-top:8px;">
+              <select id="splitModeSelect" style="width:100%;padding:6px 10px;border:1px solid var(--card-border);border-radius:var(--radius-sm);font-size:12px;background:var(--card-bg);color:var(--text-secondary);font-family:inherit;">
+                <option value="default">Default (paragraph + sentence)</option>
+                <option value="sentence">By sentence</option>
+                <option value="paragraph">By paragraph</option>
+              </select>
+            </div>
           </div>
         </div>
 
@@ -2676,69 +2732,75 @@
           <span>Final Audio</span>
           <button class="close-final" id="closeFinalAudio" title="Hide">&times;</button>
         </div>
-        <div class="custom-player" id="customPlayer">
-          <button class="cp-btn" id="cpPlayBtn" title="Play">
-            <svg viewBox="0 0 24 24" fill="currentColor">
-              <polygon points="5 3 19 12 5 21 5 3" />
-            </svg>
-          </button>
-          <span class="cp-time" id="cpTime">0:00 / 0:00</span>
-          <div class="cp-progress-bg" id="cpProgressBg">
-            <div class="cp-progress-fill" id="cpProgressFill"></div>
-          </div>
-          <button class="cp-btn cp-vol" id="cpVolBtn" title="Volume">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-              <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" />
-            </svg>
-          </button>
-          <input type="range" class="cp-vol-slider" id="cpVolSlider" min="0" max="1" step="0.05" value="1"
-            title="Volume">
-          <button class="cp-btn" id="cpSpeedBtn" title="Speed">1×</button>
-        </div>
 
         <audio id="audioPlayer" style="display:none;"></audio>
+
+        <!-- Row 1: Waveform -->
         <div class="waveform-wrap" id="waveformWrap">
           <canvas id="waveformCanvas" style="display:none;"></canvas>
           <div class="waveform-seek" id="waveformSeek"></div>
           <div class="waveform-time" id="waveformTime">0:00</div>
         </div>
-        <div class="final-audio-metadata" id="finalAudioMetadata">
-          <span id="finalDuration">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">
-              <circle cx="12" cy="12" r="10" />
-              <polyline points="12 6 12 12 16 14" />
-            </svg>
-            Duration: --
-          </span>
-          <span id="finalSegments">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">
-              <line x1="8" y1="6" x2="21" y2="6" />
-              <line x1="8" y1="12" x2="21" y2="12" />
-              <line x1="8" y1="18" x2="21" y2="18" />
-              <line x1="3" y1="6" x2="3.01" y2="6" />
-              <line x1="3" y1="12" x2="3.01" y2="12" />
-              <line x1="3" y1="18" x2="3.01" y2="18" />
-            </svg>
-            Segments: --
-          </span>
-          <span id="finalVoice">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">
-              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
-              <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-            </svg>
-            Voice: --
-          </span>
+
+        <!-- Row 2: Time bar -->
+        <div class="fa-time-row">
+          <span class="fa-time" id="faCurrentTime">0:00</span>
+          <div class="cp-progress-bg" id="cpProgressBg">
+            <div class="cp-progress-fill" id="cpProgressFill"></div>
+          </div>
+          <span class="fa-time" id="faTotalTime">0:00</span>
         </div>
-        <div class="export-options">
-          <select id="formatSelect"
-            style="padding:8px 12px;border:1px solid var(--card-border);border-radius:var(--radius-sm);font-size:13px;background:var(--card-bg);color:var(--text-secondary);">
+
+        <!-- Row 3: Controls -->
+        <div class="fa-controls">
+          <div class="fa-controls-left">
+            <button class="cp-btn cp-vol" id="cpVolBtn" title="Volume">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" />
+              </svg>
+            </button>
+            <input type="range" class="cp-vol-slider" id="cpVolSlider" min="0" max="1" step="0.05" value="1" title="Volume">
+          </div>
+          <div class="fa-controls-center">
+            <button class="cp-btn cp-seek" id="cpRewindBtn" title="-2s">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="1 4 1 10 7 10"/>
+                <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
+              </svg>
+            </button>
+            <button class="cp-btn cp-play" id="cpPlayBtn" title="Play">
+              <svg viewBox="0 0 24 24" fill="currentColor">
+                <polygon points="5 3 19 12 5 21 5 3" />
+              </svg>
+            </button>
+            <button class="cp-btn cp-seek" id="cpForwardBtn" title="+2s">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="23 4 23 10 17 10"/>
+                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+              </svg>
+            </button>
+          </div>
+          <div class="fa-controls-right">
+            <select class="fa-speed" id="faSpeedSelect">
+              <option value="0.75">0.75×</option>
+              <option value="1" selected>1×</option>
+              <option value="1.25">1.25×</option>
+              <option value="1.5">1.5×</option>
+              <option value="2">2×</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Row 4: Export + metadata -->
+        <div class="fa-export-row">
+          <select id="formatSelect" class="fa-format-select">
             <option value="mp3">MP3 128k</option>
             <option value="mp3_320">MP3 320k</option>
             <option value="wav">WAV</option>
             <option value="srt">SRT</option>
           </select>
-          <button class="btn btn-export" id="downloadBtn">
+          <button class="btn btn-export" id="downloadBtn" style="flex:1;">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
               <polyline points="7 10 12 15 17 10" />
@@ -3434,7 +3496,12 @@
         const cb = document.getElementById('splitSegmentsCheckbox');
         label.style.display = '';
         cb.disabled = false;
+        document.getElementById('splitModeOptions').style.display = cb.checked ? '' : 'none';
       }
+
+      document.getElementById('splitSegmentsCheckbox').addEventListener('change', function() {
+        document.getElementById('splitModeOptions').style.display = this.checked ? '' : 'none';
+      });
 
       function updateModelConfig() {
         const panel = document.getElementById('modelConfig');
@@ -3725,7 +3792,7 @@
           const res = await fetch(`${API_BASE}/tts/generate`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text, voice_mode: CURRENT_VOICE_MODE, voice_id: CURRENT_VOICE_ID, output_format: 'mp3', normalize, clean: document.getElementById('cleanCheckbox').checked, normalize_audio: document.getElementById('normalizeAudioCheckbox').checked, speed: parseFloat(document.getElementById('speedSlider').value), pitch: parseFloat(document.getElementById('pitchSlider').value), volume: parseFloat(document.getElementById('volumeSlider').value), split_segments: document.getElementById('splitSegmentsCheckbox').checked, cfg_strength: parseFloat(document.getElementById('cfgSlider').value), steps: parseInt(document.getElementById('stepsSlider').value), sway: parseFloat(document.getElementById('swaySlider').value), num_step: parseInt(document.getElementById('numStepSlider').value) }),
+            body: JSON.stringify({ text, voice_mode: CURRENT_VOICE_MODE, voice_id: CURRENT_VOICE_ID, output_format: 'mp3', normalize, clean: document.getElementById('cleanCheckbox').checked, normalize_audio: document.getElementById('normalizeAudioCheckbox').checked, speed: parseFloat(document.getElementById('speedSlider').value), pitch: parseFloat(document.getElementById('pitchSlider').value), volume: parseFloat(document.getElementById('volumeSlider').value), split_segments: document.getElementById('splitSegmentsCheckbox').checked, split_mode: document.getElementById('splitSegmentsCheckbox').checked ? document.getElementById('splitModeSelect').value : 'default', cfg_strength: parseFloat(document.getElementById('cfgSlider').value), steps: parseInt(document.getElementById('stepsSlider').value), sway: parseFloat(document.getElementById('swaySlider').value), num_step: parseInt(document.getElementById('numStepSlider').value) }),
           });
           if (!res.ok) throw new Error('Generation failed');
           const data = await res.json();
@@ -3795,34 +3862,8 @@
           showFinalAudio();
           CURRENT_AUDIO_URL = `${API_BASE}${data.audio_url}`;
           loadAudio(CURRENT_AUDIO_URL);
-          updateFinalAudioMetadata();
         } catch (e) { showError('Auto-merge: ' + e.message); }
       }
-
-      function updateFinalAudioMetadata() {
-        const chunks = CHUNK_DATA || [];
-        const doneChunks = chunks.filter(c => c.status === 'done');
-
-        // Get audio duration
-        if (audioPlayer.duration && !isNaN(audioPlayer.duration)) {
-          const dur = audioPlayer.duration;
-          const min = Math.floor(dur / 60);
-          const sec = Math.floor(dur % 60);
-          document.getElementById('finalDuration').innerHTML = `
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-      Duration: ${min}:${sec.toString().padStart(2, '0')}`;
-        }
-
-        document.getElementById('finalSegments').innerHTML = `
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
-    Segments: ${doneChunks.length}`;
-
-        document.getElementById('finalVoice').innerHTML = `
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/></svg>
-    Voice: ${getCurrentVoiceLabel()}`;
-      }
-
-      audioPlayer.addEventListener('loadedmetadata', updateFinalAudioMetadata);
 
       function setProgress(pct, label) {
         floatFill.style.width = Math.min(pct, 100) + '%';
@@ -3909,15 +3950,15 @@
 
       // Custom player controls
       const cpPlayBtn = document.getElementById('cpPlayBtn');
-      const cpTime = document.getElementById('cpTime');
       const cpProgressBg = document.getElementById('cpProgressBg');
       const cpProgressFill = document.getElementById('cpProgressFill');
       const cpVolBtn = document.getElementById('cpVolBtn');
       const cpVolSlider = document.getElementById('cpVolSlider');
-      const cpSpeedBtn = document.getElementById('cpSpeedBtn');
-
-      const SPEEDS = [0.75, 1, 1.25, 1.5, 2];
-      let speedIdx = 1;
+      const faCurrentTime = document.getElementById('faCurrentTime');
+      const faTotalTime = document.getElementById('faTotalTime');
+      const cpRewindBtn = document.getElementById('cpRewindBtn');
+      const cpForwardBtn = document.getElementById('cpForwardBtn');
+      const faSpeedSelect = document.getElementById('faSpeedSelect');
 
       function formatTime(s) {
         if (!s || isNaN(s)) return '0:00';
@@ -3940,26 +3981,49 @@
       cpProgressBg.addEventListener('click', e => {
         if (!audioPlayer.duration) return;
         const rect = cpProgressBg.getBoundingClientRect();
-        audioPlayer.currentTime = ((e.clientX - rect.left) / rect.width) * audioPlayer.duration;
+        const pct = (e.clientX - rect.left) / rect.width;
+        const target = pct * audioPlayer.duration;
+        audioPlayer.currentTime = target;
+      });
+
+      cpRewindBtn.addEventListener('click', () => {
+        if (!audioPlayer.duration) return;
+        const ct = audioPlayer.currentTime || 0;
+        const target = Math.max(0, ct - 2);
+        audioPlayer.currentTime = target;
+      });
+
+      cpForwardBtn.addEventListener('click', () => {
+        if (!audioPlayer.duration) return;
+        const ct = audioPlayer.currentTime || 0;
+        const target = Math.min(audioPlayer.duration, ct + 2);
+        audioPlayer.currentTime = target;
       });
 
       cpVolSlider.addEventListener('input', () => {
         audioPlayer.volume = parseFloat(cpVolSlider.value);
       });
 
-      cpSpeedBtn.addEventListener('click', () => {
-        speedIdx = (speedIdx + 1) % SPEEDS.length;
-        audioPlayer.playbackRate = SPEEDS[speedIdx];
-        cpSpeedBtn.textContent = SPEEDS[speedIdx] + '×';
+      faSpeedSelect.addEventListener('change', () => {
+        audioPlayer.playbackRate = parseFloat(faSpeedSelect.value);
       });
 
       audioPlayer.addEventListener('play', updatePlayIcon);
       audioPlayer.addEventListener('pause', updatePlayIcon);
       audioPlayer.addEventListener('timeupdate', () => {
         if (!audioPlayer.duration) return;
-        cpTime.textContent = `${formatTime(audioPlayer.currentTime)} / ${formatTime(audioPlayer.duration)}`;
-        cpProgressFill.style.width = ((audioPlayer.currentTime / audioPlayer.duration) * 100) + '%';
+        const ct = audioPlayer.currentTime;
+        if (typeof ct !== 'number' || !isFinite(ct)) {
+        return;
+        }
+        faCurrentTime.textContent = formatTime(ct);
+    faTotalTime.textContent = formatTime(audioPlayer.duration);
+        cpProgressFill.style.width = ((ct / audioPlayer.duration) * 100) + '%';
       });
+      audioPlayer.addEventListener('loadedmetadata', () => {
+        faTotalTime.textContent = formatTime(audioPlayer.duration);
+      });
+
 
       // Waveform seek interaction
       const waveformWrap = document.getElementById('waveformWrap');
@@ -3971,22 +4035,25 @@
           if (!audioPlayer.duration) return;
           const rect = waveformWrap.getBoundingClientRect();
           const pct = (e.clientX - rect.left) / rect.width;
-          audioPlayer.currentTime = pct * audioPlayer.duration;
+          const target = pct * audioPlayer.duration;
+          audioPlayer.currentTime = target;
         });
 
         waveformWrap.addEventListener('mousemove', e => {
           if (!audioPlayer.duration) return;
           const rect = waveformWrap.getBoundingClientRect();
-          const pct = (e.clientX - rect.left) / rect.width;
-          const hoverTime = pct * audioPlayer.duration;
-          const min = Math.floor(hoverTime / 60);
-          const sec = Math.floor(hoverTime % 60);
-          waveformTime.textContent = `${min}:${sec.toString().padStart(2, '0')}`;
+          let pct = (e.clientX - rect.left) / rect.width;
+          if (pct < 0) pct = 0;
+          if (pct > 1) pct = 1;
+          const ht = pct * audioPlayer.duration;
+          waveformTime.textContent = `${Math.floor(ht / 60)}:${Math.floor(ht % 60).toString().padStart(2, '0')}`;
           waveformSeek.style.width = (pct * 100) + '%';
+          waveformTime.style.opacity = '1';
         });
 
         waveformWrap.addEventListener('mouseleave', () => {
-          const progress = audioPlayer.duration > 0 ? audioPlayer.currentTime / audioPlayer.duration : 0;
+          if (!audioPlayer.duration) return;
+          const progress = audioPlayer.currentTime / audioPlayer.duration;
           waveformSeek.style.width = (progress * 100) + '%';
           waveformTime.style.opacity = '0';
         });
@@ -4030,8 +4097,10 @@
         if (!CURRENT_AUDIO_URL) return;
         const fmt = formatSelect.value;
         const url = CURRENT_AUDIO_URL + '&format=' + fmt;
+        const ext = fmt === 'mp3_320' ? 'mp3' : fmt;
+        const ts = new Date().toISOString().slice(0, 19).replace(/[:-]/g, '');
         const a = document.createElement('a');
-        a.href = url; a.download = `tts_output.${fmt}`; a.click();
+        a.href = url; a.download = `capcap_${ts}.${ext}`; a.click();
       });
 
       document.getElementById('remergeBtn').addEventListener('click', async () => {
@@ -4404,10 +4473,20 @@
           </span>
         </div>
         <div class="chunk-body" id="chunkBody_${c.index}">
-          ${chunks.length > 1 ? `<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+          ${chunks.length > 1 ? `<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;flex-wrap:wrap;">
             <span style="font-size:12px;color:var(--text-muted);flex-shrink:0;font-weight:600;">Voice:</span>
-            <select id="chunkVoice_${c.index}" onchange="updateChunkVoice(${c.index},this.value)" style="flex:1;padding:5px 8px;border:1px solid var(--card-border);border-radius:var(--radius-sm);font-size:12px;background:var(--card-bg);color:var(--text-secondary);font-family:inherit;">
-              ${(ALL_VOICES[CURRENT_VOICE_MODE] || []).map(v => `<option value="${v.id}" ${(c.voice_id || CURRENT_VOICE_ID) === v.id ? 'selected' : ''}>${v.label}</option>`).join('')}
+            <select id="chunkVoice_${c.index}" onchange="updateChunkVoice(${c.index},this.value)" style="flex:1;min-width:120px;padding:5px 8px;border:1px solid var(--card-border);border-radius:var(--radius-sm);font-size:12px;background:var(--card-bg);color:var(--text-secondary);font-family:inherit;">
+              ${_voiceOptGroups(CURRENT_VOICE_MODE, c.voice_id || CURRENT_VOICE_ID, '', '')}
+            </select>
+            <select id="chunkVoiceGender_${c.index}" onchange="_refreshChunkVoices(${c.index})" style="padding:5px 6px;border:1px solid var(--card-border);border-radius:var(--radius-sm);font-size:11px;background:var(--card-bg);color:var(--text-secondary);font-family:inherit;">
+              <option value="">Gender</option>
+              <option value="male">♂ Male</option>
+              <option value="female">♀ Female</option>
+            </select>
+            <select id="chunkVoiceType_${c.index}" onchange="_refreshChunkVoices(${c.index})" style="padding:5px 6px;border:1px solid var(--card-border);border-radius:var(--radius-sm);font-size:11px;background:var(--card-bg);color:var(--text-secondary);font-family:inherit;">
+              <option value="">Type</option>
+              <option value="clone">Clone</option>
+              <option value="default">Default</option>
             </select>
           </div>` : ''}
           <textarea id="chunkText_${c.index}" readonly>${escapeHtml(c.text)}</textarea>
@@ -4542,6 +4621,35 @@
           }, c.index * 300);
         }
         showToast(`Downloading ${done.length} segments`);
+      }
+
+      function _refreshChunkVoices(index) {
+        const sel = document.getElementById('chunkVoice_' + index);
+        if (!sel) return;
+        const c = CHUNK_DATA.find(x => x.index === index);
+        if (!c) return;
+        const gf = document.getElementById('chunkVoiceGender_' + index)?.value || '';
+        const tf = document.getElementById('chunkVoiceType_' + index)?.value || '';
+        const cur = c.voice_id || CURRENT_VOICE_ID;
+        sel.innerHTML = _voiceOptGroups(CURRENT_VOICE_MODE, cur, gf, tf);
+      }
+
+      function _voiceOptGroups(mode, selectedId, genderFilter, typeFilter) {
+        let list = ALL_VOICES[mode] || [];
+        if (genderFilter) list = list.filter(v => v.gender === genderFilter);
+        if (typeFilter === 'clone') list = list.filter(v => v.is_clone);
+        else if (typeFilter === 'default') list = list.filter(v => !v.is_clone);
+        const clones = list.filter(v => v.is_clone);
+        const defaults = list.filter(v => !v.is_clone);
+        const opt = (v) => {
+          const g = v.gender === 'male' ? '\u2642 ' : v.gender === 'female' ? '\u2640 ' : '';
+          const sel = v.id === selectedId ? ' selected' : '';
+          return `<option value="${v.id}"${sel}>${g}${escapeHtml(v.label)}</option>`;
+        };
+        let html = '';
+        if (clones.length) html += `<optgroup label="\u2605 Clone Voices">${clones.map(opt).join('')}</optgroup>`;
+        if (defaults.length) html += `<optgroup label="Default Voices">${defaults.map(opt).join('')}</optgroup>`;
+        return html;
       }
 
       function updateChunkVoice(index, voiceId) {

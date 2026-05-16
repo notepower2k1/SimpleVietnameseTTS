@@ -24,13 +24,18 @@ A self-hosted Vietnamese Text-to-Speech tool that runs entirely on your machine.
   - **Medium (F5-TTS)** — High-quality zero-shot voice cloning, GPU recommended
   - **High (OmniVoice)** — Best quality, HuggingFace model, GPU required
 - **Shared voice library** — F5 and OmniVoice share the same reference audio & text
-- **Chunk-based generation** — Long text split into segments, generated sequentially with progress tracking
-- **Segment quality check** — Auto-detects incomplete speech, low volume, excessive silence, clipping — marks segments as warning/failed
-- **Segment download** — Download individual audio segments (WAV) with one click
+- **Chunk-based generation** — Long text split into segments, generated with progress tracking
+- **Multiple split modes** — Split by sentence, paragraph, or both (default)
+- **Per-segment voice selection** — Assign different voices to individual segments
+- **Segment quality check** — Auto-detects incomplete speech, low volume, excessive silence, clipping
+- **Segment download** — Download individual segments (WAV) or all segments at once
+- **Voice cloning** — Clone voices with name, gender & description; auto-saved to shared `voices.json`
+- **Voice management** — Browse, filter by gender/type (clone/default), edit description, delete cloned voices
 - **Custom dictionary** — Override pronunciation for acronyms and non-Vietnamese words
 - **Pause control** — Adjustable silence after punctuation + custom `[Xs]` markers
 - **History** — Auto-saved generation history with playback
 - **Vietnamese normalization** — Built-in text normalization via `vietnormalizer`
+- **Advanced audio player** — Waveform visualization, real-time seek, ±2s skip, speed control, volume slider
 
 ## Segment Quality Check
 
@@ -212,13 +217,13 @@ Others on your Wi-Fi can then access via `http://<your-ip>:8000`
 
 ```
 TTS/
-├── backend/              # GPU version (Piper + F5-TTS)
-│   ├── main.py           # FastAPI endpoints
-│   ├── tts_quality_checker.py  # Segment quality evaluation
-│   ├── tts_engine.py     # PiperEngine, F5Engine, TaskManager
+├── backend/              # GPU version (Piper + F5-TTS + OmniVoice)
+│   ├── main.py           # FastAPI endpoints (download, clone, voice CRUD)
+│   ├── tts_quality_checker.py  # Segment quality evaluation module
+│   ├── tts_engine.py     # PiperEngine, F5Engine, OmniVoiceEngine, TaskManager
 │   ├── config.py         # Path configuration
 │   ├── requirements.txt  # Dependencies
-│   ├── custom_dict/      # User dictionaries
+│   ├── custom_dict/      # User dictionaries (CSV)
 │   ├── outputs/          # Generated audio files
 │   └── f5_tts/           # Local F5-TTS copy
 ├── backend_cpu/          # CPU-only version (Piper only)
@@ -240,16 +245,18 @@ TTS/
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/tts/voices` | List available voices |
+| `GET` | `/tts/voices` | List voices with `gender`, `description`, `is_clone` |
 | `POST` | `/tts/preview` | Generate short preview |
-| `POST` | `/tts/generate` | Start full generation |
-| `GET` | `/tts/status/{task_id}` | Check generation progress — returns `warning`, `issues[]`, `can_export` per segment |
-| `POST` | `/tts/merge` | Merge chunks into final audio (blocked if any chunk `can_export=false`) |
-| `POST` | `/tts/regenerate_chunk` | Regenerate a single segment |
-| `GET` | `/tts/download_file` | Download audio/SRT |
-| `POST` | `/tts/clone` | Clone a new voice (GPU only) |
-| `GET/POST/DELETE` | `/tts/dict/acronyms` | Manage acronym dictionary |
-| `GET/POST/DELETE` | `/tts/dict/words` | Manage word dictionary |
+| `POST` | `/tts/generate` | Start generation (supports `split_mode`: default/sentence/paragraph) |
+| `GET` | `/tts/status/{task_id}` | Progress + per-segment quality (`issues[]`, `can_export`, `warning`) |
+| `POST` | `/tts/merge` | Merge segments → final MP3/WAV + SRT |
+| `POST` | `/tts/regenerate_chunk` | Regenerate a segment (with optional per-segment `voice_id`) |
+| `GET` | `/tts/download_file` | Download audio (128k/320k MP3, WAV, or SRT) |
+| `POST` | `/tts/clone` | Clone a voice (accepts `gender`, `description`) |
+| `DELETE` | `/tts/voices/{voice_id}` | Delete a cloned voice |
+| `PATCH` | `/tts/voices/{voice_id}` | Update voice description/gender |
+| `GET/POST/DELETE` | `/tts/dict/acronyms` | Acronym dictionary |
+| `GET/POST/DELETE` | `/tts/dict/words` | Word dictionary |
 | `GET/POST` | `/tts/pause_config` | Pause configuration |
 | `GET/DELETE` | `/tts/history` | Generation history |
 

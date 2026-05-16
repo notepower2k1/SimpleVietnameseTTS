@@ -7,7 +7,7 @@ import shutil
 from pathlib import Path
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException, Query, UploadFile, File, Form
+from fastapi import FastAPI, HTTPException, Query, UploadFile, File, Form, Request
 from fastapi.responses import FileResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -447,6 +447,7 @@ class TTSRequest(BaseModel):
     pitch: float = 0.0
     volume: float = 0.0
     split_segments: bool = False
+    split_mode: str = "default"
     cfg_strength: float = 2.0
     steps: int = 32
     sway: float = -1.0
@@ -644,6 +645,7 @@ async def generate_tts(req: TTSRequest):
         pitch=req.pitch,
         volume=req.volume,
         split_segments=req.split_segments,
+        split_mode=req.split_mode if req.split_segments else "default",
         cfg_strength=req.cfg_strength,
         steps=req.steps,
         sway=req.sway,
@@ -665,6 +667,7 @@ async def _run_generation(task_id: str):
     do_normalize = task.get("normalize")
     do_clean = task.get("clean")
     split_seg = task.get("split_segments", False)
+    split_mode = task.get("split_mode", "default")
 
     try:
         await task_manager.update(task_id, status="processing", progress=0, stage="splitting")
@@ -676,20 +679,35 @@ async def _run_generation(task_id: str):
             return
 
         if split_seg:
-            # Split mode: per-sentence chunks
-            raw_paragraphs = re.split(r'\n\s*\n', text.strip())
-            para_sentence_counts = []
-            for p in raw_paragraphs:
-                p = p.strip()
-                if p:
-                    sents = [s.strip() for s in re.split(r'(?<=[.!?])\s+', p) if s.strip()]
-                    para_sentence_counts.append(len(sents))
-            is_new_para = []
-            for count in para_sentence_counts:
-                for j in range(count):
-                    is_new_para.append(j == 0)
-            orig_texts = list(raw_chunks)
-            gen_texts = list(raw_chunks)
+            if split_mode == "sentence":
+                # Split by sentence only — no paragraph tracking
+                sents = [s.strip() for s in re.split(r'(?<=[.!?])\s+', text.strip()) if s.strip()]
+                if not sents:
+                    sents = [text]
+                orig_texts = sents
+                gen_texts = list(sents)
+                is_new_para = [False] * len(sents)
+            elif split_mode == "paragraph":
+                # Split by paragraph only — each paragraph is one chunk
+                raw_paragraphs = [p.strip() for p in re.split(r'\n\s*\n', text.strip()) if p.strip()]
+                orig_texts = list(raw_paragraphs)
+                gen_texts = list(raw_paragraphs)
+                is_new_para = [True] * len(orig_texts)
+            else:
+                # Default: paragraph + sentence
+                raw_paragraphs = re.split(r'\n\s*\n', text.strip())
+                para_sentence_counts = []
+                for p in raw_paragraphs:
+                    p = p.strip()
+                    if p:
+                        sents = [s.strip() for s in re.split(r'(?<=[.!?])\s+', p) if s.strip()]
+                        para_sentence_counts.append(len(sents))
+                is_new_para = []
+                for count in para_sentence_counts:
+                    for j in range(count):
+                        is_new_para.append(j == 0)
+                orig_texts = list(raw_chunks)
+                gen_texts = list(raw_chunks)
             if do_normalize:
                 gen_texts = [normalize_with_pause_protection(c) for c in orig_texts]
             chunks_data = []
@@ -803,6 +821,8 @@ async def _run_generation(task_id: str):
                     await task_manager.recalc_progress(task_id)
 
             print(f"[TTS] split synth total={time.time()-t_synth:.2f}s engine={engine_type} chunks={len(orig_texts)} chars={len(text)}")
+            # Save segment metadata so SRT can be generated later
+            _save_segments_meta(task_id)
             await task_manager.update(task_id, status="chunks_done", progress=85, stage="chunks_done")
 
     except Exception as e:
@@ -1002,7 +1022,7 @@ async def merge_chunks(req: MergeRequest):
 # ─── Download ───
 
 @app.get("/tts/download_file")
-async def download_file(path: str = Query(...), format: str = Query("mp3")):
+async def download_file(path: str = Query(...), format: str = Query("")):
     file_path = OUTPUT_DIR / path
     if not file_path.exists():
         raise HTTPException(404, "File not found")
@@ -1011,26 +1031,52 @@ async def download_file(path: str = Query(...), format: str = Query("mp3")):
     if target_fmt == "srt":
         task_id = path.split("/")[0]
         srt_path = OUTPUT_DIR / task_id / "final.srt"
-        if not srt_path.exists():
-            raise HTTPException(404, "SRT file not found")
-        return FileResponse(str(srt_path), media_type="text/plain", headers={"Content-Disposition": f'attachment; filename="subtitles.srt"'})
+        if srt_path.exists():
+            return FileResponse(str(srt_path), media_type="text/plain", headers={"Content-Disposition": f'attachment; filename="subtitles.srt"'})
+        # Generate SRT from segment metadata on-the-fly
+        segs = _load_segments_meta(task_id)
+        if segs:
+            srt_lines = []
+            cum_ms = 0
+            for idx, s in enumerate(segs):
+                dur_ms = int(s.get("duration", 0) * 1000)
+                if dur_ms <= 0:
+                    continue
+                def _ms2srt(ms):
+                    h, rem = divmod(ms, 3600000)
+                    m, rem = divmod(rem, 60000)
+                    s, ms = divmod(rem, 1000)
+                    return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
+                srt_lines.append(str(idx + 1))
+                srt_lines.append(f"{_ms2srt(cum_ms)} --> {_ms2srt(cum_ms + dur_ms)}")
+                srt_lines.append(s.get("text", f"Segment {idx + 1}"))
+                srt_lines.append("")
+                cum_ms += dur_ms
+            content = "\n".join(srt_lines)
+            return Response(content=content, media_type="text/plain", headers={"Content-Disposition": 'attachment; filename="subtitles.srt"'})
+        raise HTTPException(404, "SRT file not found")
 
-    if target_fmt not in ("mp3", "wav"):
-        target_fmt = "mp3"
     src_fmt = file_path.suffix.lstrip(".")
-    if src_fmt == target_fmt:
-        media_type = "audio/mpeg" if target_fmt == "mp3" else "audio/wav"
-        return FileResponse(str(file_path), media_type=media_type, filename=f"tts_output.{target_fmt}")
+    if not target_fmt or (target_fmt == "mp3_320" and src_fmt == "mp3"):
+        # Serve original file (already 320k or no conversion needed)
+        media_type = "audio/mpeg" if src_fmt == "mp3" else "audio/wav"
+        return FileResponse(str(file_path), media_type=media_type)
+
+    # Format conversion
+    if target_fmt not in ("mp3", "mp3_320", "wav"):
+        target_fmt = "mp3"
     loop = asyncio.get_running_loop()
     audio = await loop.run_in_executor(None, AudioSegment.from_file, str(file_path))
     buf = io.BytesIO()
-    export_kwargs = {"format": target_fmt}
-    if target_fmt == "mp3":
-        export_kwargs["bitrate"] = "320k"
-    await loop.run_in_executor(None, lambda: audio.export(buf, **export_kwargs))
+    if target_fmt == "mp3_320":
+        await loop.run_in_executor(None, lambda: audio.export(buf, format="mp3", bitrate="320k"))
+    elif target_fmt == "mp3":
+        await loop.run_in_executor(None, lambda: audio.export(buf, format="mp3", bitrate="128k"))
+    else:
+        await loop.run_in_executor(None, lambda: audio.export(buf, format=target_fmt))
     buf.seek(0)
-    media_type = "audio/mpeg" if target_fmt == "mp3" else "audio/wav"
-    return Response(content=buf.read(), media_type=media_type, headers={"Content-Disposition": f'attachment; filename="tts_output.{target_fmt}"'})
+    media_type = "audio/mpeg" if target_fmt in ("mp3", "mp3_320") else "audio/wav"
+    return Response(content=buf.read(), media_type=media_type)
 
 
 # ─── Reset ───
@@ -1092,6 +1138,31 @@ async def clone_voice(voice_id: str = Form(...), ref_text: str = Form(...), ref_
         return {"voice_id": vid, "raw_name": raw_name, "status": "cloned"}
     except Exception as e:
         raise HTTPException(500, str(e))
+
+
+# ─── Segment metadata (for on-the-fly SRT generation) ───
+
+async def _save_segments_meta(task_id: str):
+    task = await task_manager.get(task_id)
+    if not task or not task.get("chunks"):
+        return
+    td = task_dir(task_id)
+    segments = []
+    for c in task["chunks"]:
+        segments.append({
+            "text": c.get("gen_text", c.get("text", "")),
+            "duration": c.get("duration", 0),
+        })
+    (td / "segments.json").write_text(json.dumps(segments, ensure_ascii=False), encoding="utf-8")
+
+def _load_segments_meta(task_id: str) -> list[dict]:
+    meta_path = task_dir(task_id) / "segments.json"
+    if not meta_path.exists():
+        return []
+    try:
+        return json.loads(meta_path.read_text(encoding="utf-8"))
+    except Exception:
+        return []
 
 
 # ─── Voice management (delete / update) ───
