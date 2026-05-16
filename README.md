@@ -28,14 +28,18 @@ A self-hosted Vietnamese Text-to-Speech tool that runs entirely on your machine.
 - **Multiple split modes** — Split by sentence, paragraph, or both (default)
 - **Per-segment voice selection** — Assign different voices to individual segments
 - **Segment quality check** — Auto-detects incomplete speech, low volume, excessive silence, clipping
-- **Segment download** — Download individual segments (WAV) or all segments at once
+- **Segment download** — Download individual segments (WAV), all segments as ZIP, or merged audio (MP3/WAV/SRT)
 - **Voice cloning** — Clone voices with name, gender & description; auto-saved to shared `voices.json`
 - **Voice management** — Browse, filter by gender/type (clone/default), edit description, delete cloned voices
+- **File queue** — Drag & drop multiple `.txt` files, batch process with per-file config (voice, split mode, speed)
+- **Auto-merge** — Multi-segment results automatically merged after generation
+- **Segment quality check** — Auto-detects incomplete speech, low volume, excessive silence, clipping
+- **Dark mode** — Toggle in header, persists across sessions
 - **Custom dictionary** — Override pronunciation for acronyms and non-Vietnamese words
 - **Pause control** — Adjustable silence after punctuation + custom `[Xs]` markers
 - **History** — Auto-saved generation history with playback
 - **Vietnamese normalization** — Built-in text normalization via `vietnormalizer`
-- **Advanced audio player** — Waveform visualization, real-time seek, ±2s skip, speed control, volume slider
+- **Advanced audio player** — Waveform visualization, real-time seek, ±2s skip, speed control, volume slider, drag seek
 
 ## Segment Quality Check
 
@@ -66,6 +70,19 @@ After each audio segment is generated, CapCap automatically evaluates its qualit
 Failed segments block the Merge & Download action. Warning segments can still be exported.
 
 You can click **Download** on any individual segment (always WAV format, lossless).
+
+## Batch Processing
+
+Drag & drop multiple `.txt` files onto the input area to add them to the processing queue:
+
+- **Per-file config** — Click a file to edit its settings (voice, split mode, speed, etc.) in the main UI
+- **Save button** — Save current UI settings as that file's configuration (shows ✓ when saved)
+- **Apply to all** — Copy current UI settings to all pending files at once
+- **Process All** — Process all pending files sequentially with their individual configs
+- **Results** — Click completed files to view segments and play merged audio
+- **Limits** — Max 20 files, empty files are automatically rejected
+
+Each file's audio output is auto-merged (for split mode) and stored in the backend's `outputs/` directory.
 
 ## Hardware Recommendation
 
@@ -234,7 +251,9 @@ TTS/
 │   ├── requirements.txt
 │   └── custom_dict/
 ├── frontend/
-│   └── index.html        # Single-page UI
+│   ├── index.html        # Single-page UI
+│   ├── capcap.svg        # Logo
+│   └── jszip.min.js      # ZIP export library
 ├── run_api.bat           # Launch GPU version
 ├── run_api_cpu.bat       # Launch CPU version
 ├── screenshot.png        # UI screenshot

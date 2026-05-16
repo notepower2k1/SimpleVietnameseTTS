@@ -38,6 +38,31 @@
       --radius-lg: 14px;
     }
 
+    [data-theme="dark"] {
+      --bg-primary: #1a1a1a;
+      --bg-secondary: #2a2a2a;
+      --card-bg: #222222;
+      --card-border: #3a3a3a;
+      --text-primary: #e0e0e0;
+      --text-secondary: #b0b0b0;
+      --text-muted: #808080;
+      --accent-primary: #6b9a8a;
+      --accent-primary-hover: #5a8a7a;
+      --accent-secondary: #a88a5a;
+      --accent-gold: #c8a84e;
+      --success: #7a9e7a;
+      --success-light: rgba(122, 158, 122, 0.15);
+      --error: #cc6b6b;
+      --error-light: rgba(204, 107, 107, 0.15);
+      --warning: #d4b36a;
+      --warning-light: rgba(212, 179, 106, 0.15);
+      --processing: #6b9a8a;
+      --processing-light: rgba(107, 154, 138, 0.15);
+      --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
+      --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+      --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
+    }
+
     * {
       box-sizing: border-box;
       margin: 0;
@@ -1298,6 +1323,30 @@
       opacity: 1;
     }
 
+    .file-queue-item {
+      display: flex; align-items: center; gap: 10px; padding: 8px 12px;
+      border: 1px solid var(--card-border); border-radius: var(--radius-sm);
+      margin-bottom: 6px; background: var(--bg-primary); font-size: 13px;
+    }
+    .file-queue-item .fq-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-primary); }
+    .file-queue-item .fq-status { font-size: 11px; flex-shrink: 0; padding: 2px 8px; border-radius: 8px; font-weight: 600; }
+    .file-queue-item .fq-status.done { background: var(--success-light); color: var(--success); }
+    .file-queue-item .fq-status.processing { background: var(--processing-light); color: var(--processing); }
+    .file-queue-item .fq-status.pending { background: var(--bg-secondary); color: var(--text-muted); }
+    .file-queue-item .fq-status.error { background: var(--error-light); color: var(--error); }
+    .file-queue-item .fq-actions { display: flex; gap: 4px; flex-shrink: 0; }
+    .file-queue-item .fq-actions button {
+      padding: 4px 8px; border: 1px solid var(--card-border); border-radius: 4px;
+      background: var(--card-bg); cursor: pointer; font-size: 12px; color: var(--text-secondary);
+      transition: all 0.2s ease;
+    }
+    .file-queue-item .fq-actions button:hover { background: var(--bg-secondary); border-color: var(--accent-primary); color: var(--accent-primary); }
+    .fq-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .fq-header span { font-size: 12px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; }
+    .fq-header button { padding: 4px 12px; border: 1px solid var(--accent-primary); border-radius: var(--radius-sm); background: var(--accent-primary); color: #fff; cursor: pointer; font-size: 12px; font-family: inherit; font-weight: 600; }
+    .fq-header button:hover { background: var(--accent-primary-hover); }
+    .fq-header button:disabled { opacity: 0.5; cursor: not-allowed; }
+
     .autosave-indicator {
       font-size: 11px;
       color: var(--text-muted);
@@ -2442,6 +2491,12 @@
           </svg>
           Reset
         </button>
+        <button class="btn-icon" id="themeBtn" title="Toggle dark mode">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+            stroke-linejoin="round">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+          </svg>
+        </button>
       </div>
     </div>
 
@@ -2458,10 +2513,11 @@
                 <polyline points="17 8 12 3 7 8" />
                 <line x1="12" y1="3" x2="12" y2="15" />
               </svg>
-              <div>Drop <span>.txt</span> <span>.md</span> or paste text</div>
+              <div>Drop <span>.txt</span> <span>.md</span> files or paste text</div>
             </div>
-            <input type="file" id="fileInput" accept=".txt,.md" style="display:none;">
+            <input type="file" id="fileInput" accept=".txt,.md" multiple style="display:none;">
           </div>
+          <div id="fileQueue" style="display:none;margin-bottom:10px;"></div>
           <div class="input-metadata" id="inputMetadata">
             <span id="charCount">0 chars</span>
             <span id="wordCount">0 words</span>
@@ -2554,7 +2610,10 @@
               </svg>
               Preview
             </button>
-            <button class="btn btn-primary" id="generateBtn">Generate</button>
+            <div style="display:flex;flex-direction:column;flex:1;">
+              <button class="btn btn-primary" id="generateBtn" style="width:100%;">Generate</button>
+              <span id="fileGenIndicator" style="font-size:11px;color:var(--text-muted);text-align:center;margin-top:2px;cursor:pointer;display: none;" onclick="_fqSelected=null;renderFileQueue();_loadFileToEditor(-1);"></span>
+            </div>
           </div>
           <div class="adv-toggle" onclick="toggleAdv(this)">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
@@ -3326,15 +3385,264 @@
         el.style.background = `linear-gradient(to right, var(--accent-primary) 0%, var(--accent-primary) ${pct}%, var(--card-border) ${pct}%, var(--card-border) 100%)`;
       });
 
+      // ─── Multi-file queue ───
+      let FILE_QUEUE = [];
+
+      let _fqSelected = null;
+      let _fqPage = 0;
+      const FQ_PER_PAGE = 7;
+
+      function _updateGenIndicator() {
+        const sel = _fqSelected !== null ? FILE_QUEUE[_fqSelected] : null;
+        document.getElementById('fileGenIndicator').textContent = sel ? 'File: ' + sel.name : '';
+      }
+
+      function _saveFileConfig(idx) {
+        const f = FILE_QUEUE[idx];
+        if (!f) return;
+        const mode = document.querySelector('#voiceModeToggle .toggle-btn.active')?.dataset.mode || 'low';
+        f.config = {
+          voice_mode: mode,
+          voice_id: CURRENT_VOICE_ID,
+          voice_label: (ALL_VOICES[mode] || []).find(v => v.id === CURRENT_VOICE_ID)?.label || CURRENT_VOICE_ID,
+          normalize: document.getElementById('normalizeCheckbox').checked,
+          clean: document.getElementById('cleanCheckbox').checked,
+          normalize_audio: document.getElementById('normalizeAudioCheckbox').checked,
+          split_segments: document.getElementById('splitSegmentsCheckbox').checked,
+          split_mode: document.getElementById('splitSegmentsCheckbox').checked ? document.getElementById('splitModeSelect').value : 'default',
+          speed: parseFloat(document.getElementById('speedSlider').value),
+          pitch: parseFloat(document.getElementById('pitchSlider').value),
+          volume: parseFloat(document.getElementById('volumeSlider').value),
+        };
+        f._configured = true;
+        showToast('Config saved for ' + f.name);
+        renderFileQueue();
+      }
+
+      function renderFileQueue() {
+        const container = document.getElementById('fileQueue');
+        if (FILE_QUEUE.length === 0) { container.style.display = 'none'; _updateGenIndicator(); return; }
+        container.style.display = '';
+        _updateGenIndicator();
+        const hasPending = FILE_QUEUE.some(f => f.status === 'pending');
+        const totalPages = Math.max(1, Math.ceil(FILE_QUEUE.length / FQ_PER_PAGE));
+        if (_fqPage >= totalPages) _fqPage = totalPages - 1;
+        const start = _fqPage * FQ_PER_PAGE;
+        const pageItems = FILE_QUEUE.slice(start, start + FQ_PER_PAGE);
+        container.innerHTML = `
+          <div class="fq-header">
+            <span>${FILE_QUEUE.length} / ${MAX_QUEUE} files${totalPages > 1 ? ' · Page ' + (_fqPage + 1) + '/' + totalPages : ''}</span>
+            <div style="display:flex;gap:4px;flex-wrap:wrap;">
+              ${hasPending ? `<button onclick="for(let i=0;i<FILE_QUEUE.length;i++){if(FILE_QUEUE[i].status==='pending')_saveFileConfig(i)}renderFileQueue();showToast('Config applied to all pending files')" style="background:var(--bg-secondary);color:var(--text-secondary);border-color:var(--card-border);font-size:11px;">Apply to all</button>` : ''}
+              ${hasPending ? `<button onclick="processAllFiles()" id="processAllBtn">Process All</button>` : ''}
+              ${totalPages > 1 && _fqPage > 0 ? `<button onclick="_fqPage--;renderFileQueue()" style="background:var(--bg-secondary);color:var(--text-secondary);border-color:var(--card-border);font-size:11px;">&#9664;</button>` : ''}
+              ${totalPages > 1 && _fqPage < totalPages - 1 ? `<button onclick="_fqPage++;renderFileQueue()" style="background:var(--bg-secondary);color:var(--text-secondary);border-color:var(--card-border);font-size:11px;">&#9654;</button>` : ''}
+              <button onclick="FILE_QUEUE=[];_fqSelected=null;renderFileQueue()" style="background:var(--bg-secondary);color:var(--text-secondary);border-color:var(--card-border);">Clear</button>
+            </div>
+          </div>
+          ${pageItems.map((f, i) => {
+            const fi = start + i;
+            const isSel = _fqSelected === fi;
+            const statusLabel = f.status === 'done' ? 'Done' : f.status === 'processing' ? 'Processing...' : f.status === 'error' ? 'Error' : 'Pending';
+            const segCount = f.chunks ? f.chunks.filter(c => c.status === 'done').length : 0;
+            const segTotal = f.chunks ? f.chunks.length : 0;
+            const cfg = f.config;
+            const cfgSummary = cfg ? `${cfg.voice_label || cfg.voice_id} ${cfg.split_segments ? cfg.split_mode : 'nosplit'}` : '';
+            return `<div class="file-queue-item" style="cursor:pointer;flex-wrap:wrap;${isSel ? 'border-color:var(--accent-primary);background:rgba(91,122,106,0.04);' : ''}" onclick="if(event.target.closest('button'))return;_fqSelected=_fqSelected===${fi}?null:${fi};_loadFileToEditor(${fi});renderFileQueue()">
+              <span class="fq-name" title="${f.name}">${escapeHtml(f.name)}</span>
+              <span style="font-size:11px;color:var(--text-muted);font-family:monospace;">
+                ${cfgSummary ? cfgSummary + ' ' : ''}${segTotal > 0 ? segCount + '/' + segTotal + ' seg' : ''}${f.duration ? ' ' + formatDuration(f.duration) : ''}
+              </span>
+              <span class="fq-status ${f.status}">${statusLabel}</span>
+              <span class="fq-actions">
+                ${f.status === 'pending' ? `<button onclick="event.stopPropagation();_saveFileConfig(${fi})" title="Save config" style="border:none;background:none;cursor:pointer;font-size:14px;color:${f._configured ? 'var(--success)' : 'var(--text-muted)'};">${f._configured ? '\u2713' : '\u2699'}</button>` : ''}
+                <button onclick="event.stopPropagation();FILE_QUEUE.splice(${fi},1);_fqSelected=_fqSelected===${fi}?null:_fqSelected;renderFileQueue()" style="color:var(--error);border:none;background:none;cursor:pointer;font-size:14px;">&#10005;</button>
+              </span>
+            </div>`;
+          }).join('')}`;
+      }
+
+      function _loadFileToEditor(idx) {
+        if (idx < 0 || idx >= FILE_QUEUE.length) {
+          CHUNK_DATA = []; CURRENT_TASK_ID = null; CURRENT_AUDIO_URL = null;
+          renderChunks([]); hideFinalAudio(); return;
+        }
+        const f = FILE_QUEUE[idx];
+        if (!f || !f.text) return;
+        textInput.value = f.text;
+        textInput.dispatchEvent(new Event('input'));
+        if (f.config) {
+          const c = f.config;
+          const mode = c.voice_mode || document.querySelector('#voiceModeToggle .toggle-btn.active')?.dataset.mode || 'low';
+          document.querySelectorAll('#voiceModeToggle .toggle-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+          CURRENT_VOICE_MODE = mode;
+          if (c.voice_id) CURRENT_VOICE_ID = c.voice_id;
+          updateVoiceLabel();
+          updateSplitCheckbox();
+          updateModelConfig();
+          document.getElementById('normalizeCheckbox').checked = c.normalize || false;
+          document.getElementById('cleanCheckbox').checked = c.clean || false;
+          document.getElementById('normalizeAudioCheckbox').checked = c.normalize_audio !== false;
+          document.getElementById('splitSegmentsCheckbox').checked = c.split_segments || false;
+          document.getElementById('splitSegmentsCheckbox').dispatchEvent(new Event('change'));
+          if (c.split_mode) document.getElementById('splitModeSelect').value = c.split_mode;
+          if (c.speed !== undefined) { document.getElementById('speedSlider').value = c.speed; document.getElementById('speedSlider').dispatchEvent(new Event('input')); }
+          if (c.pitch !== undefined) { document.getElementById('pitchSlider').value = c.pitch; document.getElementById('pitchSlider').dispatchEvent(new Event('input')); }
+          if (c.volume !== undefined) { document.getElementById('volumeSlider').value = c.volume; document.getElementById('volumeSlider').dispatchEvent(new Event('input')); }
+        }
+        // Load results into main UI if file is done
+        if (f.status === 'done' && f.chunks && f.chunks.length > 0) {
+          CHUNK_DATA = f.chunks;
+          CURRENT_TASK_ID = f.task_id || ('_file_' + idx);
+          CURRENT_AUDIO_URL = f.audio_url || null;
+          renderChunks(CHUNK_DATA);
+          if (f.audio_url) {
+            CURRENT_AUDIO_URL = f.audio_url;
+            loadAudio(`${API_BASE}${f.audio_url}`);
+            showFinalAudio();
+          }
+          if (f.chunks.length > 1) mergeSection.classList.remove('hidden');
+          else mergeSection.classList.add('hidden');
+        } else {
+          CHUNK_DATA = [];
+          CURRENT_TASK_ID = null;
+          CURRENT_AUDIO_URL = null;
+          renderChunks([]);
+          mergeSection.classList.add('hidden');
+          hideFinalAudio();
+        }
+      }
+
+      const MAX_QUEUE = 20;
+
+      function addFilesToQueue(files) {
+        if (FILE_QUEUE.length >= MAX_QUEUE) {
+          showToast('Max ' + MAX_QUEUE + ' files allowed'); return;
+        }
+        let added = 0;
+        for (const file of files) {
+          if (!file.name.endsWith('.txt') && !file.name.endsWith('.md')) continue;
+          if (file.size === 0) { showToast('Skipped empty: ' + file.name); continue; }
+          const name = file.name.replace(/\.(txt|md)$/i, '');
+          if (FILE_QUEUE.some(f => f.name === name)) continue;
+          if (FILE_QUEUE.length >= MAX_QUEUE) { showToast('Queue full, skipped remaining'); break; }
+          const idx = FILE_QUEUE.length;
+          FILE_QUEUE.push({ name, file, text: '', status: 'pending', task_id: null, audio_url: null, duration: null });
+          const reader = new FileReader();
+          reader.onload = function() {
+            const txt = (this.result || '').trim();
+            if (!txt) {
+              FILE_QUEUE.splice(idx, 1);
+              showToast('Removed empty: ' + name);
+            } else {
+              FILE_QUEUE[idx].text = txt;
+            }
+            renderFileQueue();
+          };
+          reader.readAsText(file);
+          added++;
+        }
+        renderFileQueue();
+        if (added > 0) showToast('Added ' + added + ' file' + (added > 1 ? 's' : ''));
+      }
+
+      async function processSingleFile(idx) {
+        const f = FILE_QUEUE[idx];
+        if (!f || f.status !== 'pending' || !f.text) return;
+        f.status = 'processing'; renderFileQueue();
+        try {
+          const c = f.config || {};
+          const mode = c.voice_mode || document.querySelector('#voiceModeToggle .toggle-btn.active')?.dataset.mode || 'low';
+          const vid = c.voice_id || CURRENT_VOICE_ID || 'banmai';
+          f.voice = (ALL_VOICES[mode] || []).find(v => v.id === vid)?.label || vid;
+          const res = await fetch(`${API_BASE}/tts/generate`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              text: f.text, voice_mode: mode, voice_id: vid, output_format: 'mp3',
+              normalize: c.normalize !== undefined ? c.normalize : document.getElementById('normalizeCheckbox').checked,
+              clean: c.clean !== undefined ? c.clean : document.getElementById('cleanCheckbox').checked,
+              normalize_audio: c.normalize_audio !== undefined ? c.normalize_audio : document.getElementById('normalizeAudioCheckbox').checked,
+              speed: c.speed !== undefined ? c.speed : parseFloat(document.getElementById('speedSlider').value),
+              pitch: c.pitch !== undefined ? c.pitch : parseFloat(document.getElementById('pitchSlider').value),
+              volume: c.volume !== undefined ? c.volume : parseFloat(document.getElementById('volumeSlider').value),
+              split_segments: c.split_segments !== undefined ? c.split_segments : document.getElementById('splitSegmentsCheckbox').checked,
+              split_mode: c.split_mode || (document.getElementById('splitSegmentsCheckbox').checked ? document.getElementById('splitModeSelect').value : 'default'),
+              cfg_strength: parseFloat(document.getElementById('cfgSlider').value),
+              steps: parseInt(document.getElementById('stepsSlider').value),
+              sway: parseFloat(document.getElementById('swaySlider').value),
+              num_step: parseInt(document.getElementById('numStepSlider').value),
+            }),
+          });
+          if (!res.ok) throw new Error('Generation failed');
+          const data = await res.json();
+          f.task_id = data.task_id;
+          for (let poll = 0; poll < 120; poll++) {
+            await new Promise(r => setTimeout(r, 1000));
+            const sr = await fetch(`${API_BASE}/tts/status/${data.task_id}`);
+            if (!sr.ok) throw new Error('Status failed');
+            const sd = await sr.json();
+            if (sd.status === 'chunks_done' || sd.status === 'done') {
+              f.chunks = sd.chunks || [];
+              if (sd.audio_url) {
+                f.audio_url = sd.audio_url;
+              } else if (f.chunks.length > 1) {
+                // Auto-merge multi-segment
+                try {
+                  const m = await fetch(`${API_BASE}/tts/merge`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ task_id: data.task_id, output_format: 'mp3' }),
+                  });
+                  if (m.ok) { const md = await m.json(); f.audio_url = md.audio_url; f.duration = md.duration; }
+                } catch (_) {}
+              }
+              if (!f.audio_url && f.chunks.length > 0) {
+                const done = f.chunks.find(c => c.audio_url);
+                if (done) f.audio_url = done.audio_url;
+              }
+              f.duration = sd.duration || f.duration || null;
+              f.status = 'done';
+              showToast(`Done: ${f.name}`);
+              break;
+            } else if (sd.status === 'error') {
+              throw new Error(sd.error || 'Generation error');
+            }
+          }
+          if (f.status === 'processing') { f.status = 'error'; f.error = 'Timeout'; }
+        } catch (e) {
+          f.status = 'error'; f.error = e.message;
+          showToast(`Failed: ${f.name} — ${e.message}`);
+        }
+        _fqSelected = idx;
+        renderFileQueue();
+        _loadFileToEditor(idx);
+      }
+
+      async function processAllFiles() {
+        const pending = FILE_QUEUE.map((f, i) => i).filter(i => FILE_QUEUE[i].status === 'pending');
+        if (pending.length === 0) return;
+        document.getElementById('processAllBtn').disabled = true;
+        for (const idx of pending) {
+          if (FILE_QUEUE[idx].status !== 'pending') continue;
+          await processSingleFile(idx);
+        }
+        renderFileQueue();
+      }
+
       // Drop zone handling
       dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
       dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
       dropZone.addEventListener('drop', e => {
         e.preventDefault();
         dropZone.classList.remove('dragover');
-        const file = e.dataTransfer.files[0];
-        if (file && (file.name.endsWith('.txt') || file.name.endsWith('.md'))) {
-          readFile(file);
+        const files = Array.from(e.dataTransfer.files).filter(f => f.name.endsWith('.txt') || f.name.endsWith('.md'));
+        if (files.length === 0) return;
+        if (files.length === 1 && FILE_QUEUE.length === 0) {
+          // Single file — load into textarea (backward compatible)
+          const reader = new FileReader();
+          reader.onload = ev => { textInput.value = ev.target.result; textInput.dispatchEvent(new Event('input')); showToast(`Loaded ${files[0].name}`); };
+          reader.readAsText(files[0]);
+        } else {
+          addFilesToQueue(files);
         }
       });
       dropZone.addEventListener('click', e => {
@@ -3343,18 +3651,10 @@
         }
       });
       fileInput.addEventListener('change', e => {
-        if (e.target.files[0]) readFile(e.target.files[0]);
+        const files = Array.from(e.target.files).filter(f => f.name.endsWith('.txt') || f.name.endsWith('.md'));
+        if (files.length > 0) addFilesToQueue(files);
+        e.target.value = '';
       });
-
-      function readFile(file) {
-        const reader = new FileReader();
-        reader.onload = e => {
-          textInput.value = e.target.result;
-          textInput.dispatchEvent(new Event('input'));
-          showToast(`Loaded ${file.name}`);
-        };
-        reader.readAsText(file);
-      }
 
       // Text input handling
       textInput.addEventListener('input', () => {
@@ -3772,36 +4072,70 @@
       generateBtn.addEventListener('click', startGeneration);
 
       async function startGeneration() {
-        const text = textInput.value.trim();
-        if (!text) { showError('Enter some text'); return; }
-        const normalize = document.getElementById('normalizeCheckbox').checked;
+        const selFile = _fqSelected !== null ? FILE_QUEUE[_fqSelected] : null;
+        if (selFile) {
+          // File mode: use file's stored text (ignore textarea edits)
+          if (!selFile.text) { showError('File has no text'); return; }
+          // Save current UI settings as file config before generating
+          _saveFileConfig(_fqSelected);
+        } else {
+          // Normal mode: use textarea
+          const text = textInput.value.trim();
+          if (!text) { showError('Enter some text'); return; }
+        }
         if (!CURRENT_VOICE_ID) { showError('Select a voice'); return; }
 
         hideError();
         hideFinalAudio();
         progressFloat.classList.add('visible');
         mergeSection.classList.add('hidden');
-        setProgress(0, 'Starting...');
         resetBtn.style.display = 'inline-flex';
         generateBtn.disabled = true;
         STATE = 'loading';
         GENERATION_PAUSED = false;
         GENERATION_START_TIME = Date.now();
 
+        const text = selFile ? selFile.text : textInput.value.trim();
+        const c = selFile?.config || {};
+        const mode = c.voice_mode || CURRENT_VOICE_MODE;
+        const vid = c.voice_id || CURRENT_VOICE_ID;
+
+        if (selFile) {
+          selFile.status = 'processing';
+          renderFileQueue();
+        }
+
+        setProgress(0, selFile ? 'Generating: ' + selFile.name : 'Starting...');
+
         try {
           const res = await fetch(`${API_BASE}/tts/generate`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text, voice_mode: CURRENT_VOICE_MODE, voice_id: CURRENT_VOICE_ID, output_format: 'mp3', normalize, clean: document.getElementById('cleanCheckbox').checked, normalize_audio: document.getElementById('normalizeAudioCheckbox').checked, speed: parseFloat(document.getElementById('speedSlider').value), pitch: parseFloat(document.getElementById('pitchSlider').value), volume: parseFloat(document.getElementById('volumeSlider').value), split_segments: document.getElementById('splitSegmentsCheckbox').checked, split_mode: document.getElementById('splitSegmentsCheckbox').checked ? document.getElementById('splitModeSelect').value : 'default', cfg_strength: parseFloat(document.getElementById('cfgSlider').value), steps: parseInt(document.getElementById('stepsSlider').value), sway: parseFloat(document.getElementById('swaySlider').value), num_step: parseInt(document.getElementById('numStepSlider').value) }),
+            body: JSON.stringify({
+              text, voice_mode: mode, voice_id: vid, output_format: 'mp3',
+              normalize: c.normalize !== undefined ? c.normalize : document.getElementById('normalizeCheckbox').checked,
+              clean: c.clean !== undefined ? c.clean : document.getElementById('cleanCheckbox').checked,
+              normalize_audio: c.normalize_audio !== undefined ? c.normalize_audio : document.getElementById('normalizeAudioCheckbox').checked,
+              speed: c.speed !== undefined ? c.speed : parseFloat(document.getElementById('speedSlider').value),
+              pitch: c.pitch !== undefined ? c.pitch : parseFloat(document.getElementById('pitchSlider').value),
+              volume: c.volume !== undefined ? c.volume : parseFloat(document.getElementById('volumeSlider').value),
+              split_segments: c.split_segments !== undefined ? c.split_segments : document.getElementById('splitSegmentsCheckbox').checked,
+              split_mode: c.split_mode || (document.getElementById('splitSegmentsCheckbox').checked ? document.getElementById('splitModeSelect').value : 'default'),
+              cfg_strength: parseFloat(document.getElementById('cfgSlider').value),
+              steps: parseInt(document.getElementById('stepsSlider').value),
+              sway: parseFloat(document.getElementById('swaySlider').value),
+              num_step: parseInt(document.getElementById('numStepSlider').value),
+            }),
           });
           if (!res.ok) throw new Error('Generation failed');
           const data = await res.json();
           CURRENT_TASK_ID = data.task_id;
-          pollStatus(CURRENT_TASK_ID);
+          if (selFile) selFile.task_id = data.task_id;
+          pollStatus(CURRENT_TASK_ID, selFile);
         } catch (e) { onError(e.message); }
       }
 
-      function pollStatus(taskId) {
+      function pollStatus(taskId, fileRef) {
         if (POLL_INTERVAL) clearInterval(POLL_INTERVAL);
         POLL_INTERVAL = setInterval(async () => {
           try {
@@ -3813,9 +4147,49 @@
 
             if (data.status === 'chunks_done') {
               clearInterval(POLL_INTERVAL); POLL_INTERVAL = null;
-              onChunksDone(data);
+              const chunks = data.chunks || [];
+              if (chunks.length > 1) {
+                // Auto-merge multi-segment results
+                try {
+                  const mergeRes = await fetch(`${API_BASE}/tts/merge`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ task_id: taskId, output_format: 'mp3' }),
+                  });
+                  if (mergeRes.ok) {
+                    const mergeData = await mergeRes.json();
+                    data.audio_url = mergeData.audio_url;
+                    data.duration = mergeData.duration;
+                    data.status = 'done';
+                  }
+                } catch (_) {}
+              }
+              if (fileRef) {
+                fileRef.status = 'done';
+                fileRef.chunks = chunks;
+                fileRef.audio_url = data.audio_url || (chunks.find(c => c.audio_url)?.audio_url) || null;
+                fileRef.duration = data.duration || null;
+                fileRef.voice = (ALL_VOICES[CURRENT_VOICE_MODE] || []).find(v => v.id === CURRENT_VOICE_ID)?.label || CURRENT_VOICE_ID;
+                renderFileQueue();
+              }
+              if (data.status === 'done') {
+                renderChunks(data.chunks || []);
+                if (chunks.length > 1) mergeSection.classList.remove('hidden');
+                progressFloat.classList.remove('visible');
+                showFinalAudio();
+                CURRENT_AUDIO_URL = `${API_BASE}${data.audio_url}`;
+                loadAudio(CURRENT_AUDIO_URL);
+                generateBtn.disabled = false; resetBtn.style.display = 'inline-flex'; STATE = 'done';
+              } else {
+                onChunksDone(data);
+              }
             } else if (data.status === 'done') {
               clearInterval(POLL_INTERVAL); POLL_INTERVAL = null;
+              if (fileRef) {
+                fileRef.status = 'done';
+                fileRef.audio_url = data.audio_url || fileRef.audio_url;
+                fileRef.duration = data.duration || fileRef.duration;
+                renderFileQueue();
+              }
               progressFloat.classList.remove('visible');
               showFinalAudio();
               CURRENT_AUDIO_URL = `${API_BASE}${data.audio_url}`;
@@ -3823,6 +4197,11 @@
               generateBtn.disabled = false; resetBtn.style.display = 'inline-flex'; STATE = 'done';
             } else if (data.status === 'error') {
               clearInterval(POLL_INTERVAL); POLL_INTERVAL = null;
+              if (fileRef) {
+                fileRef.status = 'error';
+                fileRef.error = data.error || 'Unknown error';
+                renderFileQueue();
+              }
               onError(data.error || 'Unknown error');
             }
           } catch (e) {
@@ -4085,7 +4464,6 @@
         setProgress(90, 'Merging audio...');
         await doMerge();
         mergeBtn.disabled = false; mergeBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;"><path d="M8 6L21 6"/><path d="M8 12L21 12"/><path d="M8 18L21 18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg> Merge &amp; Download All';
-        mergeSection.classList.add('hidden');
         progressFloat.classList.remove('visible');
       });
 
@@ -4612,15 +4990,32 @@
       function downloadAllChunks() {
         const done = CHUNK_DATA.filter(c => c.status === 'done' && c.audio_url);
         if (done.length === 0) { showToast('No segments to download'); return; }
-        for (const c of done) {
-          setTimeout(() => {
+        if (typeof JSZip !== 'undefined') {
+          const zip = new JSZip();
+          showToast('Preparing zip...');
+          Promise.all(done.map(async c => {
+            try {
+              const res = await fetch(`${API_BASE}${c.audio_url}&format=wav`);
+              if (res.ok) zip.file(`segment_${c.index + 1}.wav`, await res.blob());
+            } catch (_) {}
+          })).then(() => zip.generateAsync({ type: 'blob' })).then(blob => {
             const a = document.createElement('a');
-            a.href = `${API_BASE}${c.audio_url}&format=wav`;
-            a.download = `segment_${c.index + 1}.wav`;
-            a.click();
-          }, c.index * 300);
+            a.href = URL.createObjectURL(blob);
+            a.download = `segments_${new Date().toISOString().slice(0, 19).replace(/[:-]/g, '')}.zip`;
+            a.click(); URL.revokeObjectURL(a.href);
+            showToast(`Downloaded ${done.length} segments`);
+          });
+        } else {
+          for (const c of done) {
+            setTimeout(() => {
+              const a = document.createElement('a');
+              a.href = `${API_BASE}${c.audio_url}&format=wav`;
+              a.download = `segment_${c.index + 1}.wav`;
+              a.click();
+            }, c.index * 500);
+          }
+          showToast(`Downloading ${done.length} segments`);
         }
-        showToast(`Downloading ${done.length} segments`);
       }
 
       function _refreshChunkVoices(index) {
@@ -5111,6 +5506,16 @@
       });
 
       // Help modal
+      // Theme toggle
+      const savedTheme = localStorage.getItem('capcap_theme') || '';
+      if (savedTheme) document.documentElement.setAttribute('data-theme', savedTheme);
+      document.getElementById('themeBtn').addEventListener('click', () => {
+        const html = document.documentElement;
+        const isDark = html.getAttribute('data-theme') === 'dark';
+        if (isDark) { html.removeAttribute('data-theme'); localStorage.setItem('capcap_theme', ''); }
+        else { html.setAttribute('data-theme', 'dark'); localStorage.setItem('capcap_theme', 'dark'); }
+      });
+
       document.getElementById('helpBtn').addEventListener('click', () => {
         document.getElementById('helpModal').classList.remove('hidden');
       });
@@ -5146,6 +5551,7 @@
       updateCharCount(); updateSplitCheckbox(); updateModelConfig(); loadVoices();
       fetch(`${API_BASE}/tts/pause_config`).then(r => r.json()).then(c => { PAUSE_CFG = c; updateCharCount(); }).catch(() => { });
     </script>
+  <script src="jszip.min.js"></script>
 </body>
 
 </html>
