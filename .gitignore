@@ -17,5 +17,8 @@ build/
 .idea/
 local
 bin
+python-portable/
+python-portable-cpu/
+*.zip
 *.bat
 *.exe

@@ -15,7 +15,7 @@ F5_RESOURCE_DIR = _env_path("F5_RESOURCE_DIR", str(_DEFAULT_RESOURCE / "f5"))
 F5_VOICES_DIR = F5_RESOURCE_DIR / "f5_voice"
 OMNIVOICE_MODEL_DIR = F5_RESOURCE_DIR / "omnivoice"
 
-FFMPEG_DIR = _env_path("FFMPEG_DIR", str(_DEFAULT_RESOURCE.parent / "ffmpeg" / "bin"))
+FFMPEG_DIR = _env_path("FFMPEG_DIR", str(PROJECT_ROOT / "ffmpeg" / "bin"))
 
 OUTPUT_DIR = PROJECT_ROOT / "backend_cpu" / "outputs"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)

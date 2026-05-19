@@ -351,7 +351,7 @@ async def _run_generation(task_id: str):
             chunk_path = task_dir(task_id) / chunk_filename
             seg.export(str(chunk_path), format="wav")
             chunk_dur = round(len(seg) / 1000, 3)
-            quality = await loop.run_in_executor(None, evaluate_segment_quality, orig_texts[i], str(chunk_path))
+            quality = await loop.run_in_executor(None, evaluate_segment_quality, orig_texts[i], None, None, seg)
             await task_manager.set_chunk_audio_with_quality(task_id, i, f"/tts/download_file?path={task_id}/{chunk_filename}", duration=chunk_dur, quality=quality)
             await task_manager.recalc_progress(task_id)
 
@@ -423,7 +423,7 @@ async def regenerate_chunk(req: ChunkRegenRequest):
         chunk_path = task_dir(req.task_id) / chunk_filename
         seg.export(str(chunk_path), format="wav")
         chunk_dur = round(len(seg) / 1000, 3)
-        quality = await loop.run_in_executor(None, evaluate_segment_quality, chunk_text, str(chunk_path))
+        quality = await loop.run_in_executor(None, evaluate_segment_quality, chunk_text, None, None, seg)
         await task_manager.set_chunk_audio_with_quality(req.task_id, req.chunk_index, f"/tts/download_file?path={req.task_id}/{chunk_filename}", duration=chunk_dur, quality=quality)
         await task_manager.recalc_progress(req.task_id)
 
@@ -728,6 +728,8 @@ async def download_progress():
 @app.get("/tts/model_status")
 async def model_status():
     return {
+        "gpu": {"available": False, "name": "", "vram_gb": 0, "cuda_version": ""},
+        "recommended_quality": ["low"],
         "f5": {"loaded":False,"loading":False,"progress":0,"message":"GPU required","error":True},
         "omnivoice": {"loaded":False,"loading":False,"progress":0,"message":"GPU required","error":True},
     }

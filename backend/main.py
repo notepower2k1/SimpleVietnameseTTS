@@ -240,7 +240,7 @@ from tts_engine import (
 
 # ─── Synthesis ───
 
-def _synthesize_one(piper_engine, f5_engine, omnivoice_engine, engine_type: str, text: str, voice_id: str, speed: float = 1.0, pitch: float = 0.0, volume: float = 0.0, normalize_audio: bool = True, cfg_strength: float = 2.0, steps: int = 32, sway: float = -1.0, num_step: int = 16):
+def _synthesize_one(piper_engine, f5_engine, omnivoice_engine, engine_type: str, text: str, voice_id: str, speed: float = 1.0, pitch: float = 0.0, volume: float = 0.0, normalize_audio: bool = True, cfg_strength: float = 2.0, steps: int = 32, sway: float = -1.0, num_step: int = 16, return_raw: bool = False):
     if engine_type == "high":
         audio = omnivoice_engine.synthesize(text, voice_id, speed=speed, cfg=cfg_strength, num_step=num_step)
         sr = 24000
@@ -250,6 +250,9 @@ def _synthesize_one(piper_engine, f5_engine, omnivoice_engine, engine_type: str,
     else:
         audio = piper_engine.synthesize(text, voice_id, speed=speed)
         sr = 22050
+
+    if return_raw:
+        return audio, sr
 
     if pitch != 0 and engine_type != "high":
         import librosa
@@ -409,9 +412,20 @@ _load_state = {
 
 _VALID_VOICE_MODES = {"low", "medium", "high"}
 
+def _get_available_modes() -> set[str]:
+    modes = {"low"}
+    if f5_engine._loaded:
+        modes.add("medium")
+    if omnivoice_engine._loaded:
+        modes.add("high")
+    return modes
+
 def _validate_voice_mode(mode: str) -> str:
     if mode not in _VALID_VOICE_MODES:
         raise HTTPException(400, f"Invalid quality: {mode}. Must be one of: low, medium, high")
+    if mode not in _get_available_modes():
+        names = {"low": "Piper", "medium": "F5-TTS", "high": "OmniVoice"}
+        raise HTTPException(400, f"{names[mode]} model not loaded. Load it first via /tts/load_model")
     return mode
 
 
@@ -470,10 +484,12 @@ class MergeRequest(BaseModel):
 
 @app.get("/tts/voices")
 async def list_voices():
-    low = piper_engine.list_voices(include_rate=True)
-    medium = f5_engine.list_voices(include_rate=True)
-    high = omnivoice_engine.list_voices(include_rate=True)
-    return {"low": low, "medium": medium, "high": high}
+    result = {"low": piper_engine.list_voices(include_rate=True)}
+    if f5_engine._loaded:
+        result["medium"] = f5_engine.list_voices(include_rate=True)
+    if omnivoice_engine._loaded:
+        result["high"] = omnivoice_engine.list_voices(include_rate=True)
+    return result
 
 
 @app.get("/tts/voice_audio/{engine}/{voice_id}")
@@ -534,7 +550,34 @@ async def download_progress():
 async def model_status():
     _load_state["f5"]["loaded"] = f5_engine._loaded
     _load_state["omnivoice"]["loaded"] = omnivoice_engine._loaded
+
+    import torch
+    gpu_info = {"available": False, "name": "", "vram_gb": 0, "cuda_version": ""}
+    try:
+        if torch.cuda.is_available():
+            dev = torch.cuda.get_device_properties(0)
+            gpu_info = {
+                "available": True,
+                "name": torch.cuda.get_device_name(0),
+                "vram_gb": round(dev.total_memory / 1024**3, 1),
+                "cuda_version": torch.version.cuda or "",
+            }
+    except Exception:
+        pass
+
+    vram = gpu_info["vram_gb"]
+    if not gpu_info["available"]:
+        recommended_quality = ["low"]
+    elif vram < 4:
+        recommended_quality = ["low"]
+    elif vram < 8:
+        recommended_quality = ["low", "medium"]
+    else:
+        recommended_quality = ["low", "medium", "high"]
+
     return {
+        "gpu": gpu_info,
+        "recommended_quality": recommended_quality,
         "f5": dict(_load_state["f5"]),
         "omnivoice": dict(_load_state["omnivoice"]),
     }
@@ -742,32 +785,93 @@ async def _run_generation(task_id: str):
         steps_val = task.get("steps", 32)
         sway_val = task.get("sway", -1.0)
         num_step_val = task.get("num_step", 16)
+        td = task_dir(task_id)
+        output_format = task.get("output_format", "mp3")
 
         if not split_seg:
-            # Single-shot: whole text in one go (faster, less modular)
             t_synth = time.time()
             skip_ps = True
             gen_text = gen_texts[0]
+            has_markers = bool(CUSTOM_PAUSE_RE.search(gen_text))
             if engine_type == "medium":
                 f5_engine._force_single = True
-            def _do_full(t=gen_text, et=engine_type, vid=voice_id, pc=pause_cfg, s=spd, p=pit, v=vol, na=norm_audio, sps=skip_ps, cf=cfg_val, ns=steps_val, sw=sway_val, nms=num_step_val):
-                return synthesize_with_pauses(piper_engine, f5_engine, omnivoice_engine, t, et, vid, pc, speed=s, pitch=p, volume=v, normalize_audio=na, skip_pause_split=sps, cfg_strength=cf, steps=ns, sway=sw, num_step=nms)
             try:
-                if engine_type in ("medium", "high"):
+                if engine_type in ("medium", "high") and not has_markers:
+                    def _do_infer():
+                        return _synthesize_one(piper_engine, f5_engine, omnivoice_engine,
+                            engine_type, gen_text, voice_id, speed=spd, pitch=pit, volume=vol,
+                            normalize_audio=norm_audio, cfg_strength=cfg_val, steps=steps_val,
+                            sway=sway_val, num_step=num_step_val, return_raw=True)
                     async with gpu_lock:
-                        seg = await loop.run_in_executor(None, _do_full)
+                        audio_raw, raw_sr = await loop.run_in_executor(None, _do_infer)
+                    if pit != 0 and engine_type != "high":
+                        import librosa as _librosa
+                        import numpy as _np
+                        samples = _np.array(audio_raw.get_array_of_samples()).astype(_np.float32) / 32768
+                        shifted = _librosa.effects.pitch_shift(samples, sr=raw_sr, n_steps=pit)
+                        audio_raw = AudioSegment((shifted * 32767).astype(_np.int16).tobytes(),
+                            frame_rate=raw_sr, sample_width=2, channels=1)
+                    if norm_audio:
+                        target_db = -20
+                        if audio_raw.dBFS != float('-inf'):
+                            audio_raw = audio_raw.apply_gain(target_db - audio_raw.dBFS)
+                    if vol != 0:
+                        audio_raw = audio_raw.apply_gain(vol)
+                    seg = audio_raw
                 else:
-                    seg = await loop.run_in_executor(None, _do_full)
+                    def _do_full(t=gen_text, et=engine_type, vid=voice_id, pc=pause_cfg, s=spd, p=pit, v=vol, na=norm_audio, sps=skip_ps, cf=cfg_val, ns=steps_val, sw=sway_val, nms=num_step_val):
+                        return synthesize_with_pauses(piper_engine, f5_engine, omnivoice_engine, t, et, vid, pc, speed=s, pitch=p, volume=v, normalize_audio=na, skip_pause_split=sps, cfg_strength=cf, steps=ns, sway=sw, num_step=nms)
+                    if engine_type in ("medium", "high"):
+                        async with gpu_lock:
+                            seg = await loop.run_in_executor(None, _do_full)
+                    else:
+                        seg = await loop.run_in_executor(None, _do_full)
             finally:
                 if engine_type == "medium":
                     f5_engine._force_single = False
-            chunk_path = task_dir(task_id) / "chunk_0.wav"
-            seg.export(str(chunk_path), format="wav")
+
+            t_synth_end = time.time()
+
+            def _post(segment):
+                s = segment.strip_silence(silence_len=100, silence_thresh=-50)
+                return s.fade_in(8).fade_out(12)
+            seg = await loop.run_in_executor(None, _post, seg)
+
+            def _compress(m):
+                return m.compress_dynamic_range(threshold=-20, ratio=2.0, attack=5, release=50)
+            seg = await loop.run_in_executor(None, _compress, seg)
+
             chunk_dur = round(len(seg) / 1000, 3)
-            print(f"[TTS] non-split synth total={time.time()-t_synth:.2f}s engine={engine_type} chars={len(text)} chunk_dur={chunk_dur}s")
-            quality = await loop.run_in_executor(None, evaluate_segment_quality, text, str(chunk_path))
-            await task_manager.set_chunk_audio_with_quality(task_id, 0, f"/tts/download_file?path={task_id}/chunk_0.wav", duration=chunk_dur, quality=quality)
-            await task_manager.update(task_id, status="chunks_done", progress=85, stage="chunks_done")
+            print(f"[TTS] non-split synth total={t_synth_end-t_synth:.2f}s post={time.time()-t_synth_end:.2f}s engine={engine_type} chars={len(text)} dur={chunk_dur}s")
+
+            quality = await loop.run_in_executor(None, evaluate_segment_quality, text, None, None, seg)
+
+            chunk_path = td / "chunk_0.wav"
+            seg.export(str(chunk_path), format="wav")
+            await task_manager.set_chunk_audio_with_quality(task_id, 0,
+                f"/tts/download_file?path={task_id}/chunk_0.wav", duration=chunk_dur, quality=quality)
+
+            output_filename = f"final.{output_format}"
+            output_path = td / output_filename
+            seg.export(str(output_path), format=output_format, bitrate="320k")
+
+            def _ms2srt(ms):
+                h, rem = divmod(ms, 3600000)
+                m, rem = divmod(rem, 60000)
+                s, ms = divmod(rem, 1000)
+                return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
+            srt_lines = ["1", f"00:00:00,000 --> {_ms2srt(int(chunk_dur * 1000))}",
+                         text.strip().replace("\n", " "), ""]
+            srt_path = td / "final.srt"
+            with open(srt_path, "w", encoding="utf-8") as f:
+                f.write("\n".join(srt_lines))
+
+            duration = round(chunk_dur, 2)
+            audio_url = f"/tts/download_file?path={task_id}/{output_filename}"
+            await task_manager.update(task_id, status="done", progress=100, stage="done",
+                audio_url=audio_url, duration=duration)
+            await _save_segments_meta(task_id)
+            await _save_history(task_id)
         else:
             # Per-sentence chunking
             t_synth = time.time()
@@ -787,7 +891,7 @@ async def _run_generation(task_id: str):
                     chunk_path = task_dir(task_id) / chunk_filename
                     seg.export(str(chunk_path), format="wav")
                     chunk_dur = round(len(seg) / 1000, 3)
-                    quality = evaluate_segment_quality(orig_texts[i], str(chunk_path))
+                    quality = evaluate_segment_quality(orig_texts[i], None, None, seg)
                     return i, chunk_filename, chunk_dur, quality
 
                 tasks = [loop.run_in_executor(None, _synth_one, i) for i in range(len(orig_texts))]
@@ -816,13 +920,13 @@ async def _run_generation(task_id: str):
                     chunk_path = task_dir(task_id) / chunk_filename
                     seg.export(str(chunk_path), format="wav")
                     chunk_dur = round(len(seg) / 1000, 3)
-                    quality = await loop.run_in_executor(None, evaluate_segment_quality, orig_texts[i], str(chunk_path))
+                    quality = await loop.run_in_executor(None, evaluate_segment_quality, orig_texts[i], None, None, seg)
                     await task_manager.set_chunk_audio_with_quality(task_id, i, f"/tts/download_file?path={task_id}/{chunk_filename}", duration=chunk_dur, quality=quality)
                     await task_manager.recalc_progress(task_id)
 
             print(f"[TTS] split synth total={time.time()-t_synth:.2f}s engine={engine_type} chunks={len(orig_texts)} chars={len(text)}")
             # Save segment metadata so SRT can be generated later
-            _save_segments_meta(task_id)
+            await _save_segments_meta(task_id)
             await task_manager.update(task_id, status="chunks_done", progress=85, stage="chunks_done")
 
     except Exception as e:
@@ -918,7 +1022,7 @@ async def regenerate_chunk(req: ChunkRegenRequest):
         chunk_path = task_dir(req.task_id) / chunk_filename
         seg.export(str(chunk_path), format="wav")
         chunk_dur = round(len(seg) / 1000, 3)
-        quality = await loop.run_in_executor(None, evaluate_segment_quality, chunk_text, str(chunk_path))
+        quality = await loop.run_in_executor(None, evaluate_segment_quality, chunk_text, None, None, seg)
         await task_manager.set_chunk_audio_with_quality(req.task_id, req.chunk_index, f"/tts/download_file?path={req.task_id}/{chunk_filename}", duration=chunk_dur, quality=quality)
         await task_manager.recalc_progress(req.task_id)
 
@@ -958,13 +1062,12 @@ async def merge_chunks(req: MergeRequest):
         path = c["audio_path"].split("?path=")[-1]
         chunk_rel = path.split("/", 1)[-1] if "/" in path else path
         full_path = td / chunk_rel
-        seg = await loop.run_in_executor(None, AudioSegment.from_file, str(full_path))
 
-        # Quick wins: trim silence, fade edges
-        def _post(segment):
-            s = segment.strip_silence(silence_len=100, silence_thresh=-50)
+        def _load_post(filepath):
+            seg = AudioSegment.from_file(filepath)
+            s = seg.strip_silence(silence_len=100, silence_thresh=-50)
             return s.fade_in(8).fade_out(12)
-        seg = await loop.run_in_executor(None, _post, seg)
+        seg = await loop.run_in_executor(None, _load_post, str(full_path))
         segments.append(seg)
         chunk_dur = c.get("duration", round(len(seg) / 1000, 3))
 
@@ -983,16 +1086,13 @@ async def merge_chunks(req: MergeRequest):
         total_dur += chunk_dur
 
     # Volume match: normalize each segment to average RMS
-    if len(segments) > 1:
-        avg_db = sum(s.dBFS for s in segments) / len(segments)
-        segments = [s.apply_gain(avg_db - s.dBFS) for s in segments]
-
-    merged = await loop.run_in_executor(None, merge_audio_segments, segments)
-
-    # Light compressor: threshold=-20dB, ratio=2:1
-    def _compress(m):
-        return m.compress_dynamic_range(threshold=-20, ratio=2.0, attack=5, release=50)
-    merged = await loop.run_in_executor(None, _compress, merged)
+    def _finalize(segs):
+        if len(segs) > 1:
+            avg_db = sum(s.dBFS for s in segs) / len(segs)
+            segs = [s.apply_gain(avg_db - s.dBFS) for s in segs]
+        merged = merge_audio_segments(segs)
+        return merged.compress_dynamic_range(threshold=-20, ratio=2.0, attack=5, release=50)
+    merged = await loop.run_in_executor(None, _finalize, segments)
 
     output_filename = f"final.{output_format}"
     output_path = td / output_filename

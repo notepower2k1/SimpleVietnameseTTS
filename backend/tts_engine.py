@@ -436,29 +436,33 @@ class F5Engine:
         print(f"[F5] total time={_time.time()-t_start:.2f}s")
         peak = np.abs(final_wave).max()
         print(f"[F5] peak={peak:.4f} rms={np.sqrt(np.mean(final_wave**2)):.4f}")
-        import soundfile as sf
-        buf = io.BytesIO()
-        sf.write(buf, final_wave, target_sample_rate, format='WAV', subtype='PCM_16')
-        buf.seek(0)
-        return AudioSegment.from_wav(buf)
+        int16_data = (final_wave * 32767).clip(-32768, 32767).astype(np.int16)
+        return AudioSegment(
+            int16_data.tobytes(),
+            frame_rate=target_sample_rate,
+            sample_width=2,
+            channels=1
+        )
 
     def _ensure_audio_cache(self, voice_id: str, audio_file: Path, ref_text: str) -> dict:
         if voice_id in self._audio_cache:
             return self._audio_cache[voice_id]
 
-        import torchaudio
         import torch
+        import soundfile as sf
         from f5_tts.infer.utils_infer import (
             target_sample_rate, target_rms, hop_length,
         )
 
-        audio, sr = torchaudio.load(str(audio_file))
-        if audio.shape[0] > 1:
-            audio = torch.mean(audio, dim=0, keepdim=True)
+        audio_np, sr = sf.read(str(audio_file), dtype='float32')
+        if audio_np.ndim > 1:
+            audio_np = audio_np.mean(axis=1)
+        audio = torch.from_numpy(audio_np).unsqueeze(0)
         rms = torch.sqrt(torch.mean(torch.square(audio)))
         if rms < target_rms:
             audio = audio * target_rms / rms
         if sr != target_sample_rate:
+            import torchaudio
             audio = torchaudio.transforms.Resample(sr, target_sample_rate)(audio)
         audio = audio.to(f5_device)
 
@@ -567,6 +571,21 @@ class OmniVoiceEngine:
         _report("OmniVoice model loaded", 100)
         self.config = OmniVoiceGenerationConfig(guidance_scale=2.0)
         self._loaded = True
+        self.preload(progress_callback=progress_callback)
+
+    def preload(self, progress_callback=None):
+        voices = self.list_voices()
+        total = len(voices)
+        for idx, v in enumerate(voices):
+            vid = v["id"]
+            try:
+                self._get_voice_prompt(vid)
+                if progress_callback and total > 0:
+                    pct = 50 + int(50 * (idx + 1) / total)
+                    progress_callback(f"Preloaded voice: {vid}", pct)
+                print(f"  [OmniVoice] Preloaded voice: {vid}")
+            except Exception as e:
+                print(f"  [OmniVoice] Failed preload {vid}: {e}")
 
     def _load_meta(self) -> dict:
         meta = {}
@@ -661,15 +680,13 @@ class OmniVoiceEngine:
             wave_np = wave_np.numpy()
         wave_np = wave_np.astype(np.float32)
 
-        int16_audio = (wave_np * 32767).astype(np.int16)
-        buf = io.BytesIO()
-        with wave.open(buf, "wb") as wf:
-            wf.setnchannels(1)
-            wf.setsampwidth(2)
-            wf.setframerate(24000)
-            wf.writeframes(int16_audio.tobytes())
-        buf.seek(0)
-        return AudioSegment.from_wav(buf)
+        int16_audio = (wave_np * 32767).clip(-32768, 32767).astype(np.int16)
+        return AudioSegment(
+            int16_audio.tobytes(),
+            frame_rate=24000,
+            sample_width=2,
+            channels=1
+        )
 
     def clone_voice(self, ref_audio_path: str, ref_text: str, voice_id: str, gender: str = "male", description: str = "No description", raw_name: str = None):
         """Save reference audio and text for OmniVoice voice cloning."""

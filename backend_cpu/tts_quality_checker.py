@@ -10,8 +10,11 @@ from pydub import AudioSegment
 from pydub.silence import detect_silence
 
 
-def analyze_audio(audio_path: str) -> dict:
-    audio = AudioSegment.from_file(audio_path)
+def analyze_audio(audio_path: str = None, audio_segment=None) -> dict:
+    if audio_segment is not None:
+        audio = audio_segment
+    else:
+        audio = AudioSegment.from_file(audio_path)
     duration_sec = len(audio) / 1000.0
 
     samples = np.array(audio.get_array_of_samples())
@@ -53,7 +56,7 @@ def analyze_audio(audio_path: str) -> dict:
     }
 
 
-def evaluate_segment_quality(text: str, audio_path: str, config: dict = None) -> dict:
+def evaluate_segment_quality(text: str, audio_path: str = None, config: dict = None, audio_segment=None) -> dict:
     if config is None:
         config = _default_config()
 
@@ -64,7 +67,7 @@ def evaluate_segment_quality(text: str, audio_path: str, config: dict = None) ->
     expected_min = estimated_sec * config["duration"]["min_ratio"]
     expected_max = estimated_sec * config["duration"]["max_ratio"]
 
-    metrics = analyze_audio(audio_path)
+    metrics = analyze_audio(audio_path, audio_segment=audio_segment)
     issues = []
 
     duration_sec = metrics["duration_sec"]
